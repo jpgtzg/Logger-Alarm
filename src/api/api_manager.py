@@ -1,3 +1,7 @@
+"""
+    Written by Juan Pablo Gutiérrez
+    03 03 2025
+"""
 import dotenv
 import os
 import requests
