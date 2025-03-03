@@ -1,6 +1,7 @@
 from models.alarm import Alarm
 from models.alarm_type import AlarmType
 import time
+
 def main():
     print("Hello, World!")
 
