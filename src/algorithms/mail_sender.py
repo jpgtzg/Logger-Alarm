@@ -2,14 +2,12 @@
     Written by Juan Pablo Gutiérrez
     11 09 2024
 """
-import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.mime.base import MIMEBase
-from email import encoders
-import os
 from dotenv import load_dotenv
 from typing import List
+import os
+import smtplib
 
 load_dotenv()
 
