@@ -43,7 +43,7 @@ def get_daily_data(serial_number : str, start_date : datetime, end_date : dateti
 
 
 def get_latest_data(serial_number : str, channel_name : str):
-    start_date = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M")
+    start_date = (datetime.now() - timedelta(days=8)).strftime("%Y-%m-%d %H:%M")
     end_date = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     response = send_request(f"/Data/Channel/{serial_number}/{channel_name}/{start_date}/{end_date}/")
