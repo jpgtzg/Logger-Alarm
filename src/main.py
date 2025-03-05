@@ -47,17 +47,18 @@ def main():
             
             if thresholds:
                 new_alarms_count = 0
-                for serial_number, threshold in thresholds.items():
-                    if threshold != -1.0:
+                for serial_number, data in thresholds.items():
+                    if data['threshold'] != -1.0:
                         alarm_key = f"{serial_number}_CH1"
                         if alarm_key not in st.session_state.alarms:
                             st.session_state.alarms[alarm_key] = {
                                 "serial": serial_number,
                                 "channel": "Pressure1",
                                 "type": "BELOW",
-                                "threshold1": threshold,
+                                "threshold1": data['threshold'],
                                 "threshold2": None,
-                                "enabled": True
+                                "enabled": True,
+                                "emails": data['emails']
                             }
                             new_alarms_count += 1
                 
@@ -75,6 +76,7 @@ def main():
     new_serial = st.sidebar.text_input("Serial Number")
     new_channel = st.sidebar.text_input("Channel")
     new_type = st.sidebar.selectbox("Alarm Type", ["BELOW", "ABOVE", "BETWEEN", "OUTSIDE", "EQUAL"])
+    new_emails = st.sidebar.text_input("Email Addresses (comma-separated)")
     
     new_threshold1 = st.sidebar.number_input("Threshold 1", value=10.0)
     new_threshold2 = None
@@ -93,7 +95,8 @@ def main():
                     "type": new_type,
                     "threshold1": new_threshold1,
                     "threshold2": new_threshold2,
-                    "enabled": True
+                    "enabled": True,
+                    "emails": [email.strip() for email in new_emails.split(',') if email.strip()]
                 }
                 st.sidebar.success("Alarm added successfully!")
             else:
@@ -118,6 +121,14 @@ def main():
                     key=f"alarm_type_{alarm_key}"  # Unique key based on alarm_key
                 )
                 new_channel = st.text_input("Channel", value=alarm_data['channel'], key=f"channel_{alarm_key}")
+                
+                # Email addresses input
+                current_emails = ', '.join(alarm_data.get('emails', []))
+                new_emails = st.text_input("Email Addresses (comma-separated)", 
+                                         value=current_emails,
+                                         key=f"emails_{alarm_key}")
+                # Update emails in alarm data
+                alarm_data['emails'] = [email.strip() for email in new_emails.split(',') if email.strip()]
 
                 if new_channel != alarm_data['channel']:
                     new_alarm_key = f"{alarm_data['serial']}_{new_channel}"
