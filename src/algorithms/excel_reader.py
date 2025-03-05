@@ -65,12 +65,16 @@ def read_excel_thresholds(file_path):
 
             threshold_column = "Threshold" if "Threshold" in df.columns else "Treshhold"
             
-            if threshold_column in row and pd.notna(row[threshold_column]):
-                threshold = float(row[threshold_column])
-            else:
-                threshold = -1.0  # Set to -1 if threshold is missing or NaN
+            threshold = float(row[threshold_column]) if threshold_column in row and pd.notna(row[threshold_column]) else -1.0
             
-            threshold_dict[serial_number] = threshold
+            emails = str(row['Correos']) if 'Correos' in row and pd.notna(row['Correos']) else ""
+            email_list = [email.strip() for email in emails.split(',') if email.strip()]
+            
+            threshold_dict[serial_number] = {
+                'threshold': threshold,
+                'emails': email_list
+            }
+            
         except (ValueError, TypeError, KeyError) as e:
             print(f"Error processing row {index + 1}: {str(e)}")
             continue
