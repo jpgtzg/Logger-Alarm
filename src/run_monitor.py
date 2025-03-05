@@ -17,7 +17,7 @@ def main():
     
     try:
         monitor = AlarmMonitor()
-        monitor.run(check_interval=60)
+        monitor.run(check_interval=28800)
     except KeyboardInterrupt:
         logging.info("Service stopped by user")
         sys.exit(0)

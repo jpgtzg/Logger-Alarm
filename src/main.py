@@ -21,22 +21,6 @@ def create_alarm(serial_number, channel, alarm_type, threshold1, threshold2=None
     alarm_type_obj.set_thresholds(threshold1, threshold2)
     return Alarm(serial_number, channel, alarm_type_obj)
 
-def send_alarm_email(alarm_data):
-    for email in alarm_data['emails']:
-        subject = f"Alarm triggered: {alarm_data['serial']} - {alarm_data['channel']}"
-        body = f"The alarm {alarm_data['serial']} - {alarm_data['channel']} has been triggered with the following threshold: {alarm_data['threshold1']}"
-
-        ## TODO: Uncomment this when the email service is ready
-        #send_email(subject, body, email)
-
-def send_old_data_email(alarm_data):
-    for email in alarm_data['emails']:
-        subject = f"Old data: {alarm_data['serial']} - {alarm_data['channel']}"
-        body = f"The data for {alarm_data['serial']} - {alarm_data['channel']} is too old.\nLast update: {alarm_data['timestamp']}"
-
-        ## TODO: Uncomment this when the email service is ready
-        #send_email(subject, body, email)
-
 def parse_timestamp(timestamp_str):
     """Convert timestamp string to datetime object"""
     for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
