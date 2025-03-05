@@ -1,23 +1,41 @@
 from models.alarm import Alarm
 from models.alarm_type import AlarmType
 import streamlit as st
-import time
 from datetime import datetime, timedelta
 from api.api_manager import get_latest_data
 from algorithms.excel_reader import read_excel_thresholds
+from algorithms.mail_sender import send_email
 import pandas as pd
 import os
+import time
+from services.alarm_monitor import AlarmMonitor
 
 def initialize_session_state():
-    if 'alarms' not in st.session_state:
-        st.session_state.alarms = {}  # Dictionary to store alarms
+    if 'monitor' not in st.session_state:
+        st.session_state.monitor = AlarmMonitor()
     if 'current_time' not in st.session_state:
-        st.session_state.current_time = datetime.now()  # Store a consistent timestamp
+        st.session_state.current_time = datetime.now()
 
 def create_alarm(serial_number, channel, alarm_type, threshold1, threshold2=None):
     alarm_type_obj = AlarmType[alarm_type]
     alarm_type_obj.set_thresholds(threshold1, threshold2)
     return Alarm(serial_number, channel, alarm_type_obj)
+
+def send_alarm_email(alarm_data):
+    for email in alarm_data['emails']:
+        subject = f"Alarm triggered: {alarm_data['serial']} - {alarm_data['channel']}"
+        body = f"The alarm {alarm_data['serial']} - {alarm_data['channel']} has been triggered with the following threshold: {alarm_data['threshold1']}"
+
+        ## TODO: Uncomment this when the email service is ready
+        #send_email(subject, body, email)
+
+def send_old_data_email(alarm_data):
+    for email in alarm_data['emails']:
+        subject = f"Old data: {alarm_data['serial']} - {alarm_data['channel']}"
+        body = f"The data for {alarm_data['serial']} - {alarm_data['channel']} is too old.\nLast update: {alarm_data['timestamp']}"
+
+        ## TODO: Uncomment this when the email service is ready
+        #send_email(subject, body, email)
 
 def parse_timestamp(timestamp_str):
     """Convert timestamp string to datetime object"""
@@ -30,6 +48,7 @@ def parse_timestamp(timestamp_str):
 
 def main():
     initialize_session_state()
+    monitor = st.session_state.monitor
     
     st.title("Alarm Monitoring System")
     
@@ -50,17 +69,20 @@ def main():
                 for serial_number, data in thresholds.items():
                     if data['threshold'] != -1.0:
                         alarm_key = f"{serial_number}_CH1"
-                        if alarm_key not in st.session_state.alarms:
-                            st.session_state.alarms[alarm_key] = {
-                                "serial": serial_number,
-                                "channel": "Pressure1",
-                                "type": "BELOW",
-                                "threshold1": data['threshold'],
-                                "threshold2": None,
-                                "enabled": True,
-                                "emails": data['emails']
-                            }
-                            new_alarms_count += 1
+                        # Always update/add the alarm
+                        monitor.alarms[alarm_key] = {
+                            "serial": serial_number,
+                            "channel": "Pressure1",
+                            "type": "BELOW",
+                            "threshold1": data['threshold'],
+                            "threshold2": None,
+                            "enabled": True,
+                            "emails": data['emails']
+                        }
+                        new_alarms_count += 1
+                
+                # Save alarms after adding them from Excel
+                monitor.save_alarms()
                 
                 if new_alarms_count > 0:
                     st.success(f"Successfully added {new_alarms_count} new alarms!")
@@ -88,27 +110,34 @@ def main():
     if st.sidebar.button("Add Alarm"):
         if new_serial and new_channel:
             alarm_key = f"{new_serial}_{new_channel}"
-            if alarm_key not in st.session_state.alarms:
-                st.session_state.alarms[alarm_key] = {
-                    "serial": new_serial,
-                    "channel": new_channel,
-                    "type": new_type,
-                    "threshold1": new_threshold1,
-                    "threshold2": new_threshold2,
-                    "enabled": True,
-                    "emails": [email.strip() for email in new_emails.split(',') if email.strip()]
-                }
-                st.sidebar.success("Alarm added successfully!")
+            # Create new alarm data
+            new_alarm = {
+                "serial": new_serial,
+                "channel": new_channel,
+                "type": new_type,
+                "threshold1": new_threshold1,
+                "threshold2": new_threshold2,
+                "enabled": True,
+                "emails": [email.strip() for email in new_emails.split(',') if email.strip()]
+            }
+            
+            # Check if we're replacing an existing alarm
+            if alarm_key in monitor.alarms:
+                st.sidebar.warning(f"Replacing existing alarm for {new_serial} - {new_channel}")
             else:
-                st.sidebar.error("This serial and channel already exists!")
+                st.sidebar.success("Adding new alarm")
+            
+            # Update/add the alarm
+            monitor.alarms[alarm_key] = new_alarm
+            monitor.save_alarms()
     
     # Display alarms
     st.header("Configured Alarms")
     
     now = st.session_state.current_time  # Use stored time instead of datetime.now()
 
-    for alarm_key in list(st.session_state.alarms.keys()):
-        alarm_data = st.session_state.alarms[alarm_key]
+    for alarm_key in list(monitor.alarms.keys()):
+        alarm_data = monitor.alarms[alarm_key]
         
         with st.expander(f"Alarm: {alarm_data['serial']} - {alarm_data['channel']}", expanded=True):
             col1, col2, col3 = st.columns([2, 2, 1])
@@ -132,11 +161,11 @@ def main():
 
                 if new_channel != alarm_data['channel']:
                     new_alarm_key = f"{alarm_data['serial']}_{new_channel}"
-                    if new_alarm_key not in st.session_state.alarms:
-                        current_alarm = st.session_state.alarms.pop(alarm_key)
+                    if new_alarm_key not in monitor.alarms:
+                        current_alarm = monitor.alarms.pop(alarm_key)
                         current_alarm['channel'] = new_channel
-                        st.session_state.alarms[new_alarm_key] = current_alarm
-                        st.rerun()
+                        monitor.alarms[new_alarm_key] = current_alarm
+                        monitor.save_alarms()
                     else:
                         st.error("Alarm with this serial and channel exists!")
                 
@@ -185,14 +214,8 @@ def main():
             with col3:
                 alarm_data['enabled'] = st.checkbox("Enable", value=alarm_data['enabled'], key=f"enable_{alarm_key}")
                 if st.button("Remove", key=f"remove_{alarm_key}"):
-                    del st.session_state.alarms[alarm_key]
-                    st.rerun()
+                    del monitor.alarms[alarm_key]
+                    monitor.save_alarms()
     
-    st.sidebar.header("Auto-refresh Settings")
-    if st.sidebar.checkbox("Enable Auto-refresh", value=False):
-        refresh_interval = st.sidebar.slider("Refresh Interval (seconds)", 1, 900, 60)
-        time.sleep(refresh_interval)
-        st.rerun()
-
 if __name__ == "__main__":
     main()
