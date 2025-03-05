@@ -6,3 +6,7 @@
 *.pyz
 *.pywz
 *.pyzw
+**/*.pycache
+*.csv
+*.xlsx
+*.xls
