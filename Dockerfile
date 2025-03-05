@@ -13,4 +13,8 @@ RUN pip install --no-cache-dir --upgrade -r requirements.txt
 
 COPY . /app
 
-CMD ["python", "src/main.py"]
+RUN chmod +x start.sh
+
+EXPOSE 8501
+
+CMD ["./start.sh"]
