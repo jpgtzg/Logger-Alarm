@@ -200,6 +200,5 @@ def main():
                 if st.button("Remove", key=f"remove_{alarm_key}"):
                     del monitor.alarms[alarm_key]
                     monitor.save_alarms()
-    
 if __name__ == "__main__":
     main()
