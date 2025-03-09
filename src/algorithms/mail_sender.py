@@ -8,10 +8,11 @@ from dotenv import load_dotenv
 from typing import List
 import os
 import smtplib
+import logging
 
 load_dotenv()
 
-def send_email(subject: str, body: str, to_email: List[str]) -> bool:
+def send_email(subject: str, body: str, to_email: list):
     """Send an email using Gmail SMTP.
     
     Args:
@@ -29,28 +30,27 @@ def send_email(subject: str, body: str, to_email: List[str]) -> bool:
         print("Error: Email credentials not found in environment variables")
         return False
 
-    # Ensure to_email is a list
-    if isinstance(to_email, str):
-        to_email = [to_email]
+    # Create the email
+    msg = MIMEMultipart()
+    msg['From'] = from_email
+    msg['To'] = ", ".join(to_email)  # Join all email addresses with commas
+    msg['Subject'] = subject
+
+    # Attach the email body
+    msg.attach(MIMEText(body, 'plain'))
 
     try:
-        # Create the email message
-        msg = MIMEMultipart()
-        msg['From'] = from_email
-        msg['To'] = ", ".join(to_email)
-        msg['Subject'] = subject
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Connect to Gmail SMTP server
-        with smtplib.SMTP('smtp.gmail.com', 587) as server:
-            server.starttls()
-            server.login(from_email, password)
-            
-            # Send the email
-            server.send_message(msg)
-            print("Email sent successfully!")
-            return True
-
+        # Connect to the Gmail SMTP server
+        server = smtplib.SMTP('smtp.gmail.com', 587)
+        server.starttls()
+        server.login(from_email, password)
+        
+        # Send the email to all recipients
+        server.send_message(msg, from_addr=from_email, to_addrs=to_email)  # Pass the list directly
+        logging.info(f"Email sent successfully to {', '.join(to_email)}")
+        return True
     except Exception as e:
-        print(f"Failed to send email: {e}")
-        return False
+        logging.error(f"Failed to send email: {e}")
+    finally:
+        server.quit()
+    return False
