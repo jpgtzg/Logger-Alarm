@@ -6,6 +6,7 @@ import logging
 from services.alarm_monitor import AlarmMonitor
 from datetime import datetime
 import time
+
 def main():
     logging.basicConfig(
         filename=f'logs/monitor_{datetime.now().strftime("%Y%m%d")}.log',
@@ -16,8 +17,8 @@ def main():
     logging.info("Starting monitoring service")
     
     try:
-        monitor = AlarmMonitor()
-        monitor.run(check_interval=28800)
+        monitor = AlarmMonitor()  # Uses default times
+        monitor.run()
     except KeyboardInterrupt:
         logging.info("Service stopped by user")
         sys.exit(0)
