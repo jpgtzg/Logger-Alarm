@@ -200,5 +200,18 @@ def main():
                 if st.button("Remove", key=f"remove_{alarm_key}"):
                     del monitor.alarms[alarm_key]
                     monitor.save_alarms()
+                
+                # Add Test Email button
+                if st.button("Send Test Email", key=f"test_email_{alarm_key}"):
+                    try:
+                        latest_data = get_latest_data(alarm_data['serial'], alarm_data['channel'])
+                        if latest_data:
+                            timestamp_str, value = latest_data
+                            monitor.send_alarm_email(alarm_data, value)
+                            st.success("Test email sent!")
+                        else:
+                            st.error("No data available to send test email")
+                    except Exception as e:
+                        st.error(f"Failed to send test email: {str(e)}")
 if __name__ == "__main__":
     main()
