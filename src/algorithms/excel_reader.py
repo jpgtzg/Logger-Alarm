@@ -69,10 +69,14 @@ def read_excel_thresholds(file_path):
             
             emails = str(row['Correos']) if 'Correos' in row and pd.notna(row['Correos']) else ""
             email_list = [email.strip() for email in emails.split(',') if email.strip()]
-            
+
+            pozos = str(row['Pozo/Observacion']) if 'Pozo/Observacion' in row and pd.notna(row['Pozo/Observacion']) else ""
+            pozos_list = [pozo.strip() for pozo in pozos.split(',') if pozo.strip()]
+
             threshold_dict[serial_number] = {
                 'threshold': threshold,
-                'emails': email_list
+                'emails': email_list,
+                'pozos': pozos_list
             }
             
         except (ValueError, TypeError, KeyError) as e:

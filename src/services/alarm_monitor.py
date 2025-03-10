@@ -67,26 +67,26 @@ class AlarmMonitor:
             logging.warning(f"No email recipients for alarm {alarm_data['serial']}")
             return
         
-        subject = f"Alarm triggered: {alarm_data['serial']} - {alarm_data['channel']}"
-        body = (f"The alarm for {alarm_data['serial']} - {alarm_data['channel']} has been triggered.\n"
+        pozo_info = f" (Pozo: {alarm_data['pozo']})" if alarm_data.get('pozo') else ""
+        subject = f"Alarm triggered: {alarm_data['serial']} - {alarm_data['channel']}{pozo_info}"
+        body = (f"The alarm for {alarm_data['serial']} - {alarm_data['channel']}{pozo_info} has been triggered.\n"
                f"Current value: {value}\n"
                f"Threshold: {alarm_data['threshold1']}")
         
-        # Send to all emails at once
         send_email(subject, body, alarm_data['emails'])
         logging.info(f"Alarm email sent to {', '.join(alarm_data['emails'])} for {alarm_data['serial']}")
 
     def send_old_data_email(self, alarm_data: Dict[str, Any], timestamp: str) -> None:
         """Send old data notification email"""
-        if not alarm_data['emails']:  # Check if email list is empty
+        if not alarm_data['emails']:
             logging.warning(f"No email recipients for alarm {alarm_data['serial']}")
             return
         
-        subject = f"Old data: {alarm_data['serial']} - {alarm_data['channel']}"
-        body = (f"The data for {alarm_data['serial']} - {alarm_data['channel']} is too old.\n"
+        pozo_info = f" (Pozo: {alarm_data['pozo']})" if alarm_data.get('pozo') else ""
+        subject = f"Old data: {alarm_data['serial']} - {alarm_data['channel']}{pozo_info}"
+        body = (f"The data for {alarm_data['serial']} - {alarm_data['channel']}{pozo_info} is too old.\n"
                f"Last update: {timestamp}")
         
-        # Send to all emails at once
         send_email(subject, body, alarm_data['emails'])
         logging.info(f"Old data email sent to {', '.join(alarm_data['emails'])} for {alarm_data['serial']}")
 
@@ -116,9 +116,11 @@ class AlarmMonitor:
                         days_old = time_diff / (24 * 3600)
 
                         if days_old > 1:
+                            logging.warning(f"Old data detected for {alarm_data['serial']}")
                             self.send_old_data_email(alarm_data, timestamp_str)
                         else:
                             if alarm.check_alarm():
+                                logging.info(f"Alarm triggered for {alarm_data['serial']}")
                                 self.send_alarm_email(alarm_data, value)
                 
             except Exception as e:

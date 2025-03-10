@@ -61,7 +61,8 @@ def main():
                             "threshold1": data['threshold'],
                             "threshold2": None,
                             "enabled": True,
-                            "emails": data['emails']
+                            "emails": data['emails'],
+                            "pozo": data['pozos'][0] if data['pozos'] else ""  # Take first pozo or empty string
                         }
                         new_alarms_count += 1
                 
@@ -83,6 +84,7 @@ def main():
     new_channel = st.sidebar.text_input("Channel")
     new_type = st.sidebar.selectbox("Alarm Type", ["BELOW", "ABOVE", "BETWEEN", "OUTSIDE", "EQUAL"])
     new_emails = st.sidebar.text_input("Email Addresses (comma-separated)")
+    new_pozo = st.sidebar.text_input("Pozo Number")
     
     new_threshold1 = st.sidebar.number_input("Threshold 1", value=10.0)
     new_threshold2 = None
@@ -102,7 +104,8 @@ def main():
                 "threshold1": new_threshold1,
                 "threshold2": new_threshold2,
                 "enabled": True,
-                "emails": [email.strip() for email in new_emails.split(',') if email.strip()]
+                "emails": [email.strip() for email in new_emails.split(',') if email.strip()],
+                "pozo": new_pozo
             }
             
             # Check if we're replacing an existing alarm
@@ -134,6 +137,12 @@ def main():
                     key=f"alarm_type_{alarm_key}"  # Unique key based on alarm_key
                 )
                 new_channel = st.text_input("Channel", value=alarm_data['channel'], key=f"channel_{alarm_key}")
+                
+                # Add Pozo input
+                new_pozo = st.text_input("Pozo Number", 
+                                       value=alarm_data.get('pozo', ''),
+                                       key=f"pozo_{alarm_key}")
+                alarm_data['pozo'] = new_pozo
                 
                 # Email addresses input
                 current_emails = ', '.join(alarm_data.get('emails', []))
