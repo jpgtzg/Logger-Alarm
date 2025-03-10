@@ -2,7 +2,7 @@ from models.alarm import Alarm
 from models.alarm_type import AlarmType
 import streamlit as st
 from datetime import datetime, timedelta
-from api.api_manager import get_latest_data
+from api.api_manager import get_latest_data, get_logger_name
 from algorithms.excel_reader import read_excel_thresholds
 from algorithms.mail_sender import send_email
 import pandas as pd
@@ -36,6 +36,13 @@ def main():
     
     st.title("Alarm Monitoring System")
     
+    # Add refresh button in the top right
+    col1, col2 = st.columns([6, 1])
+    with col2:
+        if st.button("🔄 Refresh Loggers name registry"):
+            monitor.refresh_logger_names()
+            st.success("Logger names registry refreshed!")
+    
     st.header("Import Alarms from File")
     uploaded_file = st.file_uploader("Upload CSV or Excel file", type=['csv', 'xlsx', 'xls'])
     
@@ -50,9 +57,11 @@ def main():
             
             if thresholds:
                 new_alarms_count = 0
+                added_loggers = []
                 for serial_number, data in thresholds.items():
                     if data['threshold'] != -1.0:
                         alarm_key = f"{serial_number}_CH1"
+                        logger_name = monitor.get_cached_logger_name(serial_number)
                         # Always update/add the alarm
                         monitor.alarms[alarm_key] = {
                             "serial": serial_number,
@@ -62,17 +71,17 @@ def main():
                             "threshold2": None,
                             "enabled": True,
                             "emails": data['emails'],
-                            "pozo": data['pozos'][0] if data['pozos'] else ""  # Take first pozo or empty string
+                            "pozo": data['pozos'][0] if data['pozos'] else ""
                         }
                         new_alarms_count += 1
+                        added_loggers.append(f"{logger_name} ({serial_number})")
                 
                 # Save alarms after adding them from Excel
                 monitor.save_alarms()
                 
                 if new_alarms_count > 0:
                     st.success(f"Successfully added {new_alarms_count} new alarms!")
-                else:
-                    st.info("No new alarms were added.")
+                    st.info("Added loggers:\n" + "\n".join(f"• {logger}" for logger in added_loggers))
             
             os.remove(temp_file_path)
         except Exception as e:
@@ -81,6 +90,9 @@ def main():
     # Sidebar for adding alarms
     st.sidebar.header("Add New Alarm")
     new_serial = st.sidebar.text_input("Serial Number")
+    if new_serial:
+        logger_name = monitor.get_cached_logger_name(new_serial)
+        st.sidebar.info(f"Logger Name: {logger_name}")
     new_channel = st.sidebar.text_input("Channel")
     new_type = st.sidebar.selectbox("Alarm Type", ["BELOW", "ABOVE", "BETWEEN", "OUTSIDE", "EQUAL"])
     new_emails = st.sidebar.text_input("Email Addresses (comma-separated)")
@@ -125,11 +137,17 @@ def main():
 
     for alarm_key in list(monitor.alarms.keys()):
         alarm_data = monitor.alarms[alarm_key]
+        logger_name = monitor.get_cached_logger_name(alarm_data['serial'])
         
-        with st.expander(f"Alarm: {alarm_data['serial']} - {alarm_data['channel']}", expanded=True):
+        with st.expander(f"Alarm: {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}", expanded=True):
             col1, col2, col3 = st.columns([2, 2, 1])
 
             with col1:
+                # Add Logger Name display (read-only)
+                st.text_input("Logger Name", 
+                            value=logger_name,
+                            key=f"logger_name_{alarm_key}",
+                            disabled=True)
                 alarm_data['type'] = st.selectbox(
                     "Alarm Type",
                     ["BELOW", "ABOVE", "BETWEEN", "OUTSIDE", "EQUAL"],

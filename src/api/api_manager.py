@@ -23,6 +23,15 @@ def send_request(endpoint : str):
 def get_all_logs():
     return send_request("/Logger/All/")
 
+def get_logger_name(serial_number : str):
+    if type(serial_number) == str:
+        serial_number = int(serial_number)
+
+    response = get_all_logs()
+    for log in response:
+        if log["serial"] == serial_number:
+            return log["name"]
+    return None
 
 def get_logger_data(serial_number : str, start_date : datetime, end_date : datetime):
     start_date = start_date.strftime("%Y-%m-%d %H:%M")

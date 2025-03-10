@@ -23,12 +23,14 @@ logging.basicConfig(
 
 from models.alarm import Alarm
 from models.alarm_type import AlarmType
-from api.api_manager import get_latest_data
+from api.api_manager import get_latest_data, get_logger_name, get_all_logs
 from algorithms.mail_sender import send_email
 
 class AlarmMonitor:
     def __init__(self, email_sending_times=None):
         self._email_sending_times = email_sending_times or ["14:30", "18:30", "22:30"]  # UTC times (CST+6)
+        self._logger_names = {}  # Cache for logger names
+        self.refresh_logger_names()  # Fetch all logger names at startup
         self.alarms = self.load_alarms()
 
     @property
@@ -39,18 +41,49 @@ class AlarmMonitor:
     def email_sending_times(self, times):
         self._email_sending_times = times
 
+    def refresh_logger_names(self):
+        """Fetch and cache all logger names at once"""
+        try:
+            loggers = get_all_logs()
+            self._logger_names = {
+                str(logger["serial"]): logger["name"] 
+                for logger in loggers
+            }
+            logging.info(f"Successfully cached {len(self._logger_names)} logger names")
+        except Exception as e:
+            logging.error(f"Error fetching logger names: {str(e)}")
+
+    def get_cached_logger_name(self, serial_number: str) -> str:
+        """Get logger name from cache, refresh if not found"""
+        if not self._logger_names or serial_number not in self._logger_names:
+            self.refresh_logger_names()
+        return self._logger_names.get(str(serial_number), "Unknown Logger")
+
     def load_alarms(self) -> Dict[str, Any]:
-        """Load alarms from storage file"""
+        """Load alarms and logger names from storage file"""
         if os.path.exists("data/alarms.json"):
             with open("data/alarms.json", 'r') as f:
-                return json.load(f)
+                try:
+                    data = json.load(f)
+                    if isinstance(data, dict) and 'alarms' in data:
+                        # Load logger names from file if available
+                        self._logger_names.update(data.get('logger_names', {}))
+                        return data['alarms']
+                    return data  # Backward compatibility for old format
+                except json.JSONDecodeError:
+                    return {}
         return {}
     
     def save_alarms(self) -> None:
         """Save alarms to storage file"""
         os.makedirs(os.path.dirname("data/alarms.json"), exist_ok=True)
         with open("data/alarms.json", 'w') as f:
-            json.dump(self.alarms, f)
+            # Save both alarms and logger names cache
+            data = {
+                'alarms': self.alarms,
+                'logger_names': self._logger_names
+            }
+            json.dump(data, f)
 
     def parse_timestamp(self, timestamp_str: str) -> datetime:
         """Convert timestamp string to datetime object"""
@@ -63,18 +96,19 @@ class AlarmMonitor:
 
     def send_alarm_email(self, alarm_data: Dict[str, Any], value: float) -> None:
         """Send alarm notification email"""
-        if not alarm_data['emails']:  # Check if email list is empty
+        if not alarm_data['emails']:
             logging.warning(f"No email recipients for alarm {alarm_data['serial']}")
             return
         
+        logger_name = self.get_cached_logger_name(alarm_data['serial'])
         pozo_info = f" (Pozo: {alarm_data['pozo']})" if alarm_data.get('pozo') else ""
-        subject = f"Alarm triggered: {alarm_data['serial']} - {alarm_data['channel']}{pozo_info}"
-        body = (f"The alarm for {alarm_data['serial']} - {alarm_data['channel']}{pozo_info} has been triggered.\n"
+        subject = f"Alarm triggered: {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info}"
+        body = (f"The alarm for {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info} has been triggered.\n"
                f"Current value: {value}\n"
                f"Threshold: {alarm_data['threshold1']}")
         
         send_email(subject, body, alarm_data['emails'])
-        logging.info(f"Alarm email sent to {', '.join(alarm_data['emails'])} for {alarm_data['serial']}")
+        logging.info(f"Alarm email sent to {', '.join(alarm_data['emails'])} for {logger_name} ({alarm_data['serial']})")
 
     def send_old_data_email(self, alarm_data: Dict[str, Any], timestamp: str) -> None:
         """Send old data notification email"""
@@ -82,13 +116,14 @@ class AlarmMonitor:
             logging.warning(f"No email recipients for alarm {alarm_data['serial']}")
             return
         
+        logger_name = self.get_cached_logger_name(alarm_data['serial'])
         pozo_info = f" (Pozo: {alarm_data['pozo']})" if alarm_data.get('pozo') else ""
-        subject = f"Old data: {alarm_data['serial']} - {alarm_data['channel']}{pozo_info}"
-        body = (f"The data for {alarm_data['serial']} - {alarm_data['channel']}{pozo_info} is too old.\n"
+        subject = f"Old data: {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info}"
+        body = (f"The data for {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info} is too old.\n"
                f"Last update: {timestamp}")
         
         send_email(subject, body, alarm_data['emails'])
-        logging.info(f"Old data email sent to {', '.join(alarm_data['emails'])} for {alarm_data['serial']}")
+        logging.info(f"Old data email sent to {', '.join(alarm_data['emails'])} for {logger_name} ({alarm_data['serial']})")
 
     def check_alarms(self) -> None:
         """Check all enabled alarms"""
@@ -99,6 +134,7 @@ class AlarmMonitor:
                 continue
 
             try:
+                logger_name = self.get_cached_logger_name(alarm_data['serial'])
                 # Create alarm object
                 alarm_type = AlarmType[alarm_data['type']]
                 alarm_type.set_thresholds(alarm_data['threshold1'], alarm_data.get('threshold2'))
@@ -116,11 +152,11 @@ class AlarmMonitor:
                         days_old = time_diff / (24 * 3600)
 
                         if days_old > 1:
-                            logging.warning(f"Old data detected for {alarm_data['serial']}")
+                            logging.warning(f"Old data detected for {logger_name} ({alarm_data['serial']})")
                             self.send_old_data_email(alarm_data, timestamp_str)
                         else:
                             if alarm.check_alarm():
-                                logging.info(f"Alarm triggered for {alarm_data['serial']}")
+                                logging.info(f"Alarm triggered for {logger_name} ({alarm_data['serial']})")
                                 self.send_alarm_email(alarm_data, value)
                 
             except Exception as e:
