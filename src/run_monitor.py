@@ -20,13 +20,8 @@ def setup_logging():
     os.makedirs('data', exist_ok=True)
     
     logging.basicConfig(
-        filename=f'logs/monitor_{datetime.now().strftime("%Y%m%d")}.log',
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.FileHandler(f'logs/monitor_{datetime.now().strftime("%Y%m%d")}.log'),
-            logging.StreamHandler()
-        ]
+        format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
 def signal_handler(signum, frame):
