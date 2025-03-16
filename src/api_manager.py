@@ -14,7 +14,9 @@ logging.basicConfig(
 
 app = FastAPI(title="Alarm Monitor API")
 
+# Initialize alarm monitor and load logger names
 alarm_monitor = AlarmMonitor()
+alarm_monitor.load_logger_names()  # Load logger names on startup
 
 @app.get("/")
 async def root():
@@ -41,7 +43,8 @@ async def get_alarms():
                     "threshold2": alarm.alarm_type.threshold2,
                     "active": alarm.active,
                     "emails": alarm.emails,
-                    "pozo": alarm.pozo
+                    "pozo": alarm.pozo,
+                    "logger_name": alarm.logger_name
                 } for key, alarm in alarms.items()
             }
         }
@@ -105,6 +108,51 @@ async def test_alarm(alarm_id: str):
 async def get_check_times():
     """Get configured check times"""
     return {"check_times": alarm_monitor.checking_times}
+
+@app.post("/refresh-logger-names")
+async def refresh_logger_names():
+    """Refresh all logger names from the API"""
+    try:
+        alarm_monitor._all_logs = []  # Clear cache
+        alarm_monitor.load_logger_names()
+        return {"message": "Logger names refreshed successfully"}
+    except Exception as e:
+        logging.error(f"Error refreshing logger names: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/logger-names")
+async def get_logger_names():
+    """Get all logger names"""
+    try:
+        if not alarm_monitor._all_logs:
+            alarm_monitor.load_logger_names()
+        
+        logger_names = {
+            alarm.serial_number: alarm.logger_name 
+            for alarm in alarm_monitor.alarms.values()
+            if alarm.logger_name
+        }
+        return {
+            "count": len(logger_names),
+            "logger_names": logger_names
+        }
+    except Exception as e:
+        logging.error(f"Error getting logger names: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/logger-names/{serial_number}")
+async def get_logger_name(serial_number: str):
+    """Get name for a specific logger"""
+    try:
+        name = alarm_monitor._get_logger_name(serial_number)
+        if name is None:
+            raise HTTPException(status_code=404, detail=f"Logger {serial_number} not found")
+        return {"serial_number": serial_number, "name": name}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"Error getting logger name: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -7,12 +7,13 @@ from typing import List, Dict, Any
 import logging
 from models.alarm_type import AlarmType
 import threading
-
+from api.api_manager import get_all_logs
 logger = logging.getLogger(__name__)
 
 class AlarmMonitor:
     _instance = None
     _initialized = False
+    _all_logs = []
     
     def __new__(cls, checking_times: list[str] = None):
         if cls._instance is None:
@@ -24,7 +25,6 @@ class AlarmMonitor:
         if not self._initialized:
             self._alarms_lock = threading.Lock()
             self._logger_names_lock = threading.Lock()
-            self._logger_names = {}
             self.checking_times = checking_times or ["14:30", "18:30", "22:30"]
             self.alarms = self.load_alarms()
             self._initialized = True
@@ -140,10 +140,6 @@ class AlarmMonitor:
                         logging.error(f"Error loading alarm {alarm_key}: {str(e)}")
                         continue
                 
-                if isinstance(data, dict) and 'logger_names' in data:
-                    with self._logger_names_lock:
-                        self._logger_names.update(data['logger_names'])
-                
                 logging.info(f"Successfully loaded {len(alarms)} alarms")
                 
             except json.JSONDecodeError as e:
@@ -154,6 +150,22 @@ class AlarmMonitor:
             logging.info("No alarms.json file found, starting with empty alarms")
         
         return alarms
+
+    def load_logger_names(self):
+        for alarm in self.alarms.values():
+            alarm.logger_name = self._get_logger_name(alarm.serial_number)
+
+    def _get_logger_name(self, serial_number: str):
+        if type(serial_number) == str:
+            serial_number = int(serial_number)
+
+        if not self._all_logs:
+            self._all_logs = get_all_logs()
+
+        for log in self._all_logs:
+            if log["serial"] == serial_number:
+                return log["name"]
+        return None
 
     def save_alarms(self) -> None:
         """Save alarms to storage file"""
@@ -176,11 +188,9 @@ class AlarmMonitor:
                 }
                 
                 with open("data/alarms.json", 'w') as f:
-                    with self._logger_names_lock:
-                        json.dump({
-                            'alarms': alarm_dict,
-                            'logger_names': self._logger_names
-                        }, f, indent=2)
+                    json.dump({
+                        'alarms': alarm_dict,
+                    }, f, indent=2)
                     
             logging.info(f"Successfully saved {len(self.alarms)} alarms")
             
@@ -249,35 +259,3 @@ class AlarmMonitor:
     def get_next_check_time(self) -> datetime:
         """Get the next scheduled check time"""
         return self.get_next_run_time(datetime.now(), self.checking_times)
-
-    def get_logger_name(self, serial_number: str) -> str:
-        """Get the human-readable name for a logger
-        
-        Args:
-            serial_number: The logger's serial number
-            
-        Returns:
-            str: The logger's name or the serial number if not found
-        """
-        with self._logger_names_lock:
-            return self._logger_names.get(serial_number, serial_number)
-
-    def update_logger_name(self, serial_number: str, name: str) -> None:
-        """Update or add a logger name
-        
-        Args:
-            serial_number: The logger's serial number
-            name: The human-readable name for the logger
-        """
-        with self._logger_names_lock:
-            self._logger_names[serial_number] = name
-            self.save_alarms()  # Save changes to persist logger names
-
-    def get_all_logger_names(self) -> Dict[str, str]:
-        """Get all logger names
-        
-        Returns:
-            Dict[str, str]: Dictionary mapping serial numbers to logger names
-        """
-        with self._logger_names_lock:
-            return self._logger_names.copy()
