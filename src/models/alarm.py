@@ -6,6 +6,7 @@
 """
 
 from datetime import datetime
+from typing import Dict, Any
 
 from algorithms.mail_sender import send_email
 from .alarm_type import AlarmType
@@ -24,32 +25,92 @@ logging.basicConfig(
 )
 
 class Alarm:
-
     active: bool = True
 
-    def __init__(self, serial_number: str, channel: str, pozo: str, emails: list[str], alarm_type: AlarmType):
+    def __init__(self, 
+                 serial_number: str, 
+                 channel: str, 
+                 alarm_type: AlarmType,
+                 pozo: str = "",
+                 emails: list[str] = None):
+        """
+        Initialize an Alarm instance
+        
+        Args:
+            serial_number: Logger serial number
+            channel: Channel name
+            alarm_type: AlarmType instance
+            pozo: Pozo identifier (optional)
+            emails: List of email addresses (optional)
+        """
         self.serial_number = serial_number
         self.channel = channel
-        self.pozo = pozo
         self.alarm_type = alarm_type
-        self.emails = emails
-        self.id = serial_number + "_" + channel
+        self.pozo = pozo
+        self.emails = emails or []
+        self.id = f"{serial_number}_{channel}"
+        self.active = True
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'Alarm':
+        """
+        Create an Alarm instance from a dictionary
         
-    def __init__(self, json_data: dict):
-        self.serial_number = json_data["serial_number"]
-        self.channel = json_data["channel"]
-        self.pozo = json_data["pozo"]
-        self.emails = json_data["emails"]
-        self.alarm_type = AlarmType(json_data["alarm_type"])
-        self.id = self.serial_number + "_" + self.channel
-    
-    def update(self, json_data: dict):
-        self.serial_number = json_data["serial_number"]
-        self.channel = json_data["channel"]
-        self.pozo = json_data["pozo"]
-        self.emails = json_data["emails"]
-        self.alarm_type = AlarmType(json_data["alarm_type"])
-        self.id = self.serial_number + "_" + self.channel
+        Args:
+            data: Dictionary containing alarm configuration
+                Required keys: 'serial', 'channel', 'type', 'threshold1'
+                Optional keys: 'threshold2', 'enabled', 'emails', 'pozo'
+        """
+        # Create and configure alarm type
+        alarm_type = AlarmType[data['type']]
+        alarm_type.set_thresholds(data['threshold1'], data.get('threshold2'))
+        
+        # Create alarm instance
+        alarm = cls(
+            serial_number=data['serial'],
+            channel=data['channel'],
+            alarm_type=alarm_type,
+            pozo=data.get('pozo', ''),
+            emails=data.get('emails', [])
+        )
+        alarm.active = data.get('enabled', True)
+        alarm.id = f"{data['serial']}_{data['channel']}"
+        return alarm
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert alarm instance to dictionary representation"""
+        return {
+            'serial': self.serial_number,
+            'channel': self.channel,
+            'type': self.alarm_type.name,
+            'threshold1': self.alarm_type.threshold1,
+            'threshold2': self.alarm_type.threshold2,
+            'enabled': self.active,
+            'emails': self.emails,
+            'pozo': self.pozo
+        }
+
+    def update(self, data: Dict[str, Any]) -> None:
+        """
+        Update alarm configuration from dictionary
+        
+        Args:
+            data: Dictionary containing new alarm configuration
+        """
+        if 'type' in data:
+            alarm_type = AlarmType[data['type']]
+            alarm_type.set_thresholds(
+                data.get('threshold1', self.alarm_type.threshold1),
+                data.get('threshold2', self.alarm_type.threshold2)
+            )
+            self.alarm_type = alarm_type
+        
+        self.serial_number = data.get('serial', self.serial_number)
+        self.channel = data.get('channel', self.channel)
+        self.pozo = data.get('pozo', self.pozo)
+        self.emails = data.get('emails', self.emails)
+        self.active = data.get('enabled', self.active)
+        self.id = f"{self.serial_number}_{self.channel}"
 
     def __str__(self):
         return f"Alarm(serial_number={self.serial_number}, channel_name={self.channel}, alarm_type={self.alarm_type}, active={self.active}, id={self.id})"
