@@ -9,17 +9,22 @@ from enum import Enum
 from typing import Union, Tuple, Optional
 
 class AlarmType(Enum):
-    BELOW = "below"          # Triggers when value falls below threshold
-    ABOVE = "above"          # Triggers when value rises above threshold
-    BETWEEN = "between"      # Triggers when value is between two thresholds
-    OUTSIDE = "outside"      # Triggers when value is outside two thresholds
-    EQUAL = "equal"          # Triggers when value equals threshold
+    BELOW = "below"          
+    ABOVE = "above"          
+    BETWEEN = "between"      
+    OUTSIDE = "outside"      
+    EQUAL = "equal"          
 
     def __init__(self, value: str):
         super().__init__()
         self._value = value
         self._threshold1: Optional[float] = None
         self._threshold2: Optional[float] = None
+
+    def __init__(self, json_data: dict):
+        self._value = json_data["value"]
+        self._threshold1 = json_data["threshold1"]
+        self._threshold2 = json_data["threshold2"]
 
     def __str__(self) -> str:
         return self._value
