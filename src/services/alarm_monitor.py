@@ -1,170 +1,26 @@
-"""
-    Backend service for monitoring alarms continuously
-"""
-import time
-from datetime import datetime, timedelta
-from typing import Dict, Any, List
 import json
 import os
-import logging
-
-# Create necessary directories
-os.makedirs('logs', exist_ok=True)
-os.makedirs('data', exist_ok=True)
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/alarm_monitor.log'),
-        logging.StreamHandler()
-    ]
-)
-
+import time
 from models.alarm import Alarm
+from datetime import datetime, timedelta
+from typing import List, Dict, Any
+import logging
 from models.alarm_type import AlarmType
-from api.api_manager import get_latest_data, get_logger_name, get_all_logs
-from algorithms.mail_sender import send_email
+import threading
+
+logger = logging.getLogger(__name__)
 
 class AlarmMonitor:
-    def __init__(self, email_sending_times=None):
-        self._email_sending_times = email_sending_times or ["14:30", "18:30", "22:30"]  # UTC times (CST+6)
-        self._logger_names = {}  # Cache for logger names
-        self.refresh_logger_names()  # Fetch all logger names at startup
+    def __init__(self, checking_times: list[datetime]):
+        self._alarms_lock = threading.Lock()
+        self._logger_names_lock = threading.Lock()
+        self._logger_names = {}
+        self.checking_times = checking_times
         self.alarms = self.load_alarms()
 
-    @property
-    def email_sending_times(self):
-        return self._email_sending_times
+    def run(self):
 
-    @email_sending_times.setter
-    def email_sending_times(self, times):
-        self._email_sending_times = times
-
-    def refresh_logger_names(self):
-        """Fetch and cache all logger names at once"""
-        try:
-            loggers = get_all_logs()
-            self._logger_names = {
-                str(logger["serial"]): logger["name"] 
-                for logger in loggers
-            }
-            logging.info(f"Successfully cached {len(self._logger_names)} logger names")
-        except Exception as e:
-            logging.error(f"Error fetching logger names: {str(e)}")
-
-    def get_cached_logger_name(self, serial_number: str) -> str:
-        """Get logger name from cache, refresh if not found"""
-        if not self._logger_names or serial_number not in self._logger_names:
-            self.refresh_logger_names()
-        return self._logger_names.get(str(serial_number), "Unknown Logger")
-
-    def load_alarms(self) -> Dict[str, Any]:
-        """Load alarms and logger names from storage file"""
-        if os.path.exists("data/alarms.json"):
-            with open("data/alarms.json", 'r') as f:
-                try:
-                    data = json.load(f)
-                    if isinstance(data, dict) and 'alarms' in data:
-                        # Load logger names from file if available
-                        self._logger_names.update(data.get('logger_names', {}))
-                        return data['alarms']
-                    return data  # Backward compatibility for old format
-                except json.JSONDecodeError:
-                    return {}
-        return {}
-    
-    def save_alarms(self) -> None:
-        """Save alarms to storage file"""
-        os.makedirs(os.path.dirname("data/alarms.json"), exist_ok=True)
-        with open("data/alarms.json", 'w') as f:
-            # Save both alarms and logger names cache
-            data = {
-                'alarms': self.alarms,
-                'logger_names': self._logger_names
-            }
-            json.dump(data, f)
-
-    def parse_timestamp(self, timestamp_str: str) -> datetime:
-        """Convert timestamp string to datetime object"""
-        for fmt in ("%Y-%m-%d %H:%M", "%Y-%m-%d %H:%M:%S"):
-            try:
-                return datetime.strptime(timestamp_str, fmt)
-            except ValueError:
-                continue
-        return None
-
-    def send_alarm_email(self, alarm_data: Dict[str, Any], value: float) -> None:
-        """Send alarm notification email"""
-        if not alarm_data['emails']:
-            logging.warning(f"No email recipients for alarm {alarm_data['serial']}")
-            return
-        
-        logger_name = self.get_cached_logger_name(alarm_data['serial'])
-        pozo_info = f" (Pozo: {alarm_data['pozo']})" if alarm_data.get('pozo') else ""
-        subject = f"Alarm triggered: {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info}"
-        body = (f"The alarm for {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info} has been triggered.\n"
-               f"Current value: {value}\n"
-               f"Threshold: {alarm_data['threshold1']}")
-        
-        send_email(subject, body, alarm_data['emails'])
-        logging.info(f"Alarm email sent to {', '.join(alarm_data['emails'])} for {logger_name} ({alarm_data['serial']})")
-
-    def send_old_data_email(self, alarm_data: Dict[str, Any], timestamp: str) -> None:
-        """Send old data notification email"""
-        if not alarm_data['emails']:
-            logging.warning(f"No email recipients for alarm {alarm_data['serial']}")
-            return
-        
-        logger_name = self.get_cached_logger_name(alarm_data['serial'])
-        pozo_info = f" (Pozo: {alarm_data['pozo']})" if alarm_data.get('pozo') else ""
-        subject = f"Old data: {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info}"
-        body = (f"The data for {logger_name} ({alarm_data['serial']}) - {alarm_data['channel']}{pozo_info} is too old.\n"
-               f"Last update: {timestamp}")
-        
-        send_email(subject, body, alarm_data['emails'])
-        logging.info(f"Old data email sent to {', '.join(alarm_data['emails'])} for {logger_name} ({alarm_data['serial']})")
-
-    def check_alarms(self) -> None:
-        """Check all enabled alarms"""
-        now = datetime.now()
-        
-        for alarm_key, alarm_data in self.alarms.items():
-            if not alarm_data.get('enabled', True):
-                continue
-
-            try:
-                logger_name = self.get_cached_logger_name(alarm_data['serial'])
-                # Create alarm object
-                alarm_type = AlarmType[alarm_data['type']]
-                alarm_type.set_thresholds(alarm_data['threshold1'], alarm_data.get('threshold2'))
-                alarm = Alarm(alarm_data['serial'], alarm_data['channel'], alarm_type)
-
-                # Get latest data
-                latest_data = get_latest_data(alarm_data['serial'], alarm_data['channel'])
-                
-                if latest_data:
-                    timestamp_str, value = latest_data
-                    timestamp = self.parse_timestamp(timestamp_str)
-
-                    if timestamp:
-                        time_diff = (now - timestamp).total_seconds()
-                        days_old = time_diff / (24 * 3600)
-
-                        if days_old > 1:
-                            logging.warning(f"Old data detected for {logger_name} ({alarm_data['serial']})")
-                            self.send_old_data_email(alarm_data, timestamp_str)
-                        else:
-                            if alarm.check_alarm():
-                                logging.info(f"Alarm triggered for {logger_name} ({alarm_data['serial']})")
-                                self.send_alarm_email(alarm_data, value)
-                
-            except Exception as e:
-                logging.error(f"Error checking alarm {alarm_key}: {str(e)}")
-
-    def run(self) -> None:
-        """Run continuous monitoring"""
-        logging.info(f"Starting alarm monitoring service with check times: {self._email_sending_times}")
+        logging.info(f"Starting monitoring service for alarms at {self.checking_times}")
         
         def get_next_run_time(current_time: datetime, check_times: List[str]) -> datetime:
             """Get the next closest run time from now.
@@ -203,20 +59,154 @@ class AlarmMonitor:
             return next_time
 
         while True:
+            current_time = datetime.now()
+            next_run = get_next_run_time(current_time, self.checking_times)
+            
+            sleep_seconds = (next_run - current_time).total_seconds()
+            
+            logging.info(f"Next check scheduled for: {next_run.strftime('%Y-%m-%d %H:%M')}")
+            logging.info(f"Sleeping for {sleep_seconds/3600:.2f} hours")
+            
+            time.sleep(sleep_seconds)
+            
+            self.check_alarms()
+
+    def check_alarms(self):
+        with self._alarms_lock:
+            alarms_to_check = self.alarms.copy()
+        
+        for alarm in alarms_to_check.values():
+            if not alarm.is_active():
+                continue
             try:
-                current_time = datetime.now()
-                next_run = get_next_run_time(current_time, self._email_sending_times)
-                
-                sleep_seconds = (next_run - current_time).total_seconds()
-                
-                logging.info(f"Next check scheduled for: {next_run.strftime('%Y-%m-%d %H:%M')}")
-                logging.info(f"Sleeping for {sleep_seconds/3600:.2f} hours")
-                
-                time.sleep(sleep_seconds)
-                
-                self.alarms = self.load_alarms()  # Reload alarms in case of updates
-                self.check_alarms()
-                
+                alarm.check_alarm()
             except Exception as e:
-                logging.error(f"Error in monitoring loop: {str(e)}")
-                time.sleep(60) 
+                logging.error(f"Error checking alarm {alarm.id}: {str(e)}")
+
+    def get_alarms(self):
+        with self._alarms_lock:
+            return self.alarms.copy()
+
+    def create_alarm(self, json_data: Dict[str, Any] | List[Dict[str, Any]]) -> List[str]:
+        """
+        Create new alarm(s) from JSON data and add to alarms dictionary
+        
+        Args:
+            json_data: Either a single alarm dictionary or list of alarm dictionaries
+        
+        Returns:
+            List[str]: List of created alarm IDs
+        """
+        created_ids = []
+        try:
+            # Convert single dict to list for uniform processing
+            alarm_data_list = [json_data] if isinstance(json_data, dict) else json_data
+            
+            with self._alarms_lock:
+                for data in alarm_data_list:
+                    alarm = Alarm.from_dict(data)
+                    self.alarms[alarm.id] = alarm
+                    created_ids.append(alarm.id)
+                    logging.info(f"Created alarm: {alarm.id} for logger {alarm.serial_number}")
+                
+                self.save_alarms()
+            
+            return created_ids
+            
+        except Exception as e:
+            logging.error(f"Error creating alarm(s): {str(e)}")
+            raise ValueError(f"Failed to create alarm(s): {str(e)}")
+
+    def update_alarm(self, alarm_key: str, json_data: dict) -> None:
+        """
+        Update an existing alarm with new data
+        
+        Args:
+            alarm_key: The alarm identifier (serial_number_channel)
+            json_data: Dictionary containing new alarm configuration
+        """
+        try:
+            with self._alarms_lock:
+                if alarm_key not in self.alarms:
+                    raise KeyError(f"Alarm {alarm_key} not found")
+                
+                self.alarms[alarm_key].update(json_data)
+                self.save_alarms()
+                
+            logging.info(f"Updated alarm: {alarm_key}")
+            
+        except Exception as e:
+            logging.error(f"Error updating alarm {alarm_key}: {str(e)}")
+            raise ValueError(f"Failed to update alarm: {str(e)}")
+
+    def load_alarms(self) -> Dict[str, Alarm]:
+        """
+        Load alarms from storage file and convert to Alarm objects
+        
+        Returns:
+            Dict[str, Alarm]: Dictionary with alarm_key -> Alarm object mapping
+        """
+        alarms = {}
+        if os.path.exists("data/alarms.json"):
+            try:
+                with open("data/alarms.json", 'r') as f:
+                    data = json.load(f)
+                    
+                alarm_data = data.get('alarms', data) if isinstance(data, dict) else data
+                
+                for alarm_key, alarm_dict in alarm_data.items():
+                    try:
+                        alarm = Alarm.from_dict(alarm_dict)
+                        alarms[alarm_key] = alarm
+                        logging.info(f"Loaded alarm: {alarm_key} for logger {alarm.serial_number}")
+                    except Exception as e:
+                        logging.error(f"Error loading alarm {alarm_key}: {str(e)}")
+                        continue
+                
+                if isinstance(data, dict) and 'logger_names' in data:
+                    with self._logger_names_lock:
+                        self._logger_names.update(data['logger_names'])
+                
+                logging.info(f"Successfully loaded {len(alarms)} alarms")
+                
+            except json.JSONDecodeError as e:
+                logging.error(f"Error decoding alarms.json: {str(e)}")
+            except Exception as e:
+                logging.error(f"Unexpected error loading alarms: {str(e)}")
+        else:
+            logging.info("No alarms.json file found, starting with empty alarms")
+        
+        return alarms
+
+    def save_alarms(self) -> None:
+        """Save alarms to storage file"""
+        try:
+            os.makedirs(os.path.dirname("data/alarms.json"), exist_ok=True)
+            
+            with self._alarms_lock:
+                alarm_dict = {
+                    key: {
+                        'serial': alarm.serial_number,
+                        'channel': alarm.channel,
+                        'type': alarm.alarm_type.name,
+                        'threshold1': alarm.alarm_type.threshold1,
+                        'threshold2': alarm.alarm_type.threshold2,
+                        'enabled': alarm.active,  
+                        'emails': alarm.emails,
+                        'pozo': alarm.pozo
+                    }
+                    for key, alarm in self.alarms.items()
+                }
+                
+                with open("data/alarms.json", 'w') as f:
+                    with self._logger_names_lock:
+                        json.dump({
+                            'alarms': alarm_dict,
+                            'logger_names': self._logger_names
+                        }, f, indent=2)
+                    
+            logging.info(f"Successfully saved {len(self.alarms)} alarms")
+            
+        except Exception as e:
+            logging.error(f"Error saving alarms: {str(e)}")
+            raise
