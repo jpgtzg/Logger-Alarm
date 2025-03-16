@@ -32,7 +32,8 @@ class Alarm:
                  channel: str, 
                  alarm_type: AlarmType,
                  pozo: str = "",
-                 emails: list[str] = None):
+                 emails: list[str] = None,
+                 logger_name: str = ""):
         """
         Initialize an Alarm instance
         
@@ -48,6 +49,7 @@ class Alarm:
         self.alarm_type = alarm_type
         self.pozo = pozo
         self.emails = emails or []
+        self.logger_name = logger_name
         self.id = f"{serial_number}_{channel}"
         self.active = True
 
@@ -59,7 +61,7 @@ class Alarm:
         Args:
             data: Dictionary containing alarm configuration
                 Required keys: 'serial', 'channel', 'type', 'threshold1'
-                Optional keys: 'threshold2', 'enabled', 'emails', 'pozo'
+                Optional keys: 'threshold2', 'enabled', 'emails', 'pozo', 'logger_name'
         """
         # Create and configure alarm type
         alarm_type = AlarmType[data['type']]
@@ -71,7 +73,8 @@ class Alarm:
             channel=data['channel'],
             alarm_type=alarm_type,
             pozo=data.get('pozo', ''),
-            emails=data.get('emails', [])
+            emails=data.get('emails', []),
+            logger_name=data.get('logger_name', '')
         )
         alarm.active = data.get('enabled', True)
         alarm.id = f"{data['serial']}_{data['channel']}"
@@ -87,7 +90,8 @@ class Alarm:
             'threshold2': self.alarm_type.threshold2,
             'enabled': self.active,
             'emails': self.emails,
-            'pozo': self.pozo
+            'pozo': self.pozo,
+            'logger_name': self.logger_name
         }
 
     def update(self, data: Dict[str, Any]) -> None:
@@ -110,6 +114,7 @@ class Alarm:
         self.pozo = data.get('pozo', self.pozo)
         self.emails = data.get('emails', self.emails)
         self.active = data.get('enabled', self.active)
+        self.logger_name = data.get('logger_name', self.logger_name)
         self.id = f"{self.serial_number}_{self.channel}"
 
     def __str__(self):
@@ -124,14 +129,15 @@ class Alarm:
             logging.warning(f"No email recipients for alarm {self.serial_number}")
             return
         
-        pozo_info = f" (Pozo: {self.pozo})" 
-        subject = f"Alarm triggered: {self.serial_number} - {self.channel}{pozo_info}"
-        body = (f"The alarm for {self.serial_number} - {self.channel}{pozo_info} has been triggered.\n"
+        display_name = self.logger_name if self.logger_name else self.serial_number
+        pozo_info = f" (Pozo: {self.pozo})" if self.pozo else ""
+        subject = f"Alarm triggered: {display_name} - {self.channel}{pozo_info}"
+        body = (f"The alarm for {display_name} ({self.serial_number}) - {self.channel}{pozo_info} has been triggered.\n"
                f"Current value: {value}\n"
                f"Threshold: {self.alarm_type.threshold1}")
         
         send_email(subject, body, self.emails)
-        logging.info(f"Alarm email sent to {', '.join(self.emails)} for {self.serial_number} - {self.channel}")
+        logging.info(f"Alarm email sent to {', '.join(self.emails)} for {display_name} - {self.serial_number} - {self.channel}")
 
     def send_old_data_email(self, timestamp: str) -> None:
         """Send old data notification email"""
@@ -139,13 +145,14 @@ class Alarm:
             logging.warning(f"No email recipients for alarm {self.serial_number}")
             return
         
-        pozo_info = f" (Pozo: {self.pozo})" 
-        subject = f"Old data: {self.serial_number} - {self.channel}{pozo_info}"
-        body = (f"The data for {self.serial_number} - {self.channel}{pozo_info} is too old.\n"
+        display_name = self.logger_name if self.logger_name else self.serial_number
+        pozo_info = f" (Pozo: {self.pozo})" if self.pozo else ""
+        subject = f"Old data: {display_name} - {self.channel}{pozo_info}"
+        body = (f"The data for {display_name} ({self.serial_number}) - {self.channel}{pozo_info} is too old.\n"
                f"Last update: {timestamp}")
         
         send_email(subject, body, self.emails)
-        logging.info(f"Old data email sent to {', '.join(self.emails)} for {self.serial_number} - {self.channel}")
+        logging.info(f"Old data email sent to {', '.join(self.emails)} for {display_name} - {self.serial_number} - {self.channel}")
 
 
     def parse_timestamp(self, timestamp_str: str) -> datetime:
