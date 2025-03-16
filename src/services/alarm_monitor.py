@@ -249,3 +249,35 @@ class AlarmMonitor:
     def get_next_check_time(self) -> datetime:
         """Get the next scheduled check time"""
         return self.get_next_run_time(datetime.now(), self.checking_times)
+
+    def get_logger_name(self, serial_number: str) -> str:
+        """Get the human-readable name for a logger
+        
+        Args:
+            serial_number: The logger's serial number
+            
+        Returns:
+            str: The logger's name or the serial number if not found
+        """
+        with self._logger_names_lock:
+            return self._logger_names.get(serial_number, serial_number)
+
+    def update_logger_name(self, serial_number: str, name: str) -> None:
+        """Update or add a logger name
+        
+        Args:
+            serial_number: The logger's serial number
+            name: The human-readable name for the logger
+        """
+        with self._logger_names_lock:
+            self._logger_names[serial_number] = name
+            self.save_alarms()  # Save changes to persist logger names
+
+    def get_all_logger_names(self) -> Dict[str, str]:
+        """Get all logger names
+        
+        Returns:
+            Dict[str, str]: Dictionary mapping serial numbers to logger names
+        """
+        with self._logger_names_lock:
+            return self._logger_names.copy()
