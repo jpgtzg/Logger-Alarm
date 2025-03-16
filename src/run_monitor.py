@@ -6,7 +6,10 @@ import logging
 from services.alarm_monitor import AlarmMonitor
 from datetime import datetime
 import time
-
+import os
+email_sending_times = ["14:30", "18:30", "22:30"]
+os.makedirs('logs', exist_ok=True)
+os.makedirs('data', exist_ok=True)
 def main():
     logging.basicConfig(
         filename=f'logs/monitor_{datetime.now().strftime("%Y%m%d")}.log',
@@ -17,7 +20,7 @@ def main():
     logging.info("Starting monitoring service")
     
     try:
-        monitor = AlarmMonitor()  # Uses default times
+        monitor = AlarmMonitor(email_sending_times)  # Uses default times
         monitor.run()
     except KeyboardInterrupt:
         logging.info("Service stopped by user")
