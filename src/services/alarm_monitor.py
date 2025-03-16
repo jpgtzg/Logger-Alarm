@@ -11,56 +11,33 @@ import threading
 logger = logging.getLogger(__name__)
 
 class AlarmMonitor:
-    def __init__(self, checking_times: list[datetime]):
-        self._alarms_lock = threading.Lock()
-        self._logger_names_lock = threading.Lock()
-        self._logger_names = {}
-        self.checking_times = checking_times
-        self.alarms = self.load_alarms()
+    _instance = None
+    _initialized = False
+    
+    def __new__(cls, checking_times: list[str] = None):
+        if cls._instance is None:
+            cls._instance = super(AlarmMonitor, cls).__new__(cls)
+        return cls._instance
+
+    def __init__(self, checking_times: list[str] = None):
+        # Only initialize once
+        if not self._initialized:
+            self._alarms_lock = threading.Lock()
+            self._logger_names_lock = threading.Lock()
+            self._logger_names = {}
+            self.checking_times = checking_times or ["14:30", "18:30", "22:30"]
+            self.alarms = self.load_alarms()
+            self._initialized = True
+        elif checking_times is not None and checking_times != self.checking_times:
+            logging.warning(f"Attempted to reinitialize AlarmMonitor with different checking times. Using existing times: {self.checking_times}")
 
     def run(self):
 
         logging.info(f"Starting monitoring service for alarms at {self.checking_times}")
-        
-        def get_next_run_time(current_time: datetime, check_times: List[str]) -> datetime:
-            """Get the next closest run time from now.
-            
-            Args:
-                current_time: Current datetime
-                check_times: List of times in "HH:MM" format
-            
-            Returns:
-                datetime: Next closest future run time
-            """
-            # Convert all check times to datetime objects for today
-            today_times = [datetime.strptime(t, "%H:%M").replace(
-                year=current_time.year,
-                month=current_time.month,
-                day=current_time.day
-            ) for t in check_times]
-            
-            # Add tomorrow's times
-            tomorrow_times = [t + timedelta(days=1) for t in today_times]
-            all_times = today_times + tomorrow_times
-            
-            # Get all future times and their time differences
-            future_times_with_diff = [
-                (t, (t - current_time).total_seconds()) 
-                for t in all_times 
-                if t > current_time
-            ]
-            
-            # Sort by time difference and get the closest one
-            next_time = min(future_times_with_diff, key=lambda x: x[1])[0]
-            
-            logging.info(f"Current time: {current_time.strftime('%Y-%m-%d %H:%M')}")
-            logging.info(f"Next check time: {next_time.strftime('%Y-%m-%d %H:%M')}")
-            
-            return next_time
-
+         
         while True:
             current_time = datetime.now()
-            next_run = get_next_run_time(current_time, self.checking_times)
+            next_run = self.get_next_run_time(current_time, self.checking_times)
             
             sleep_seconds = (next_run - current_time).total_seconds()
             
@@ -210,3 +187,65 @@ class AlarmMonitor:
         except Exception as e:
             logging.error(f"Error saving alarms: {str(e)}")
             raise
+
+    def test_alarm(self, alarm_id: str) -> bool:
+        """
+        Test a specific alarm by forcing a check
+        
+        Args:
+            alarm_id: The ID of the alarm to test
+            
+        Returns:
+            bool: True if alarm was triggered, False otherwise
+            
+        Raises:
+            KeyError: If alarm_id not found
+        """
+        with self._alarms_lock:
+            if alarm_id not in self.alarms:
+                raise KeyError(f"Alarm {alarm_id} not found")
+            
+            alarm = self.alarms[alarm_id]
+            
+        # Run check without sending email
+        return alarm.check_alarm(send_email=False)
+
+    def get_next_run_time(self, current_time: datetime, check_times: List[str]) -> datetime:
+            """Get the next closest run time from now.
+            
+            Args:
+                current_time: Current datetime
+                check_times: List of times in "HH:MM" format
+            
+            Returns:
+                datetime: Next closest future run time
+            """
+            # Convert all check times to datetime objects for today
+            today_times = [datetime.strptime(t, "%H:%M").replace(
+                year=current_time.year,
+                month=current_time.month,
+                day=current_time.day
+            ) for t in check_times]
+            
+            # Add tomorrow's times
+            tomorrow_times = [t + timedelta(days=1) for t in today_times]
+            all_times = today_times + tomorrow_times
+            
+            # Get all future times and their time differences
+            future_times_with_diff = [
+                (t, (t - current_time).total_seconds()) 
+                for t in all_times 
+                if t > current_time
+            ]
+            
+            # Sort by time difference and get the closest one
+            next_time = min(future_times_with_diff, key=lambda x: x[1])[0]
+            
+            logging.info(f"Current time: {current_time.strftime('%Y-%m-%d %H:%M')}")
+            logging.info(f"Next check time: {next_time.strftime('%Y-%m-%d %H:%M')}")
+            
+            return next_time
+
+    def get_next_check_time(self) -> datetime:
+        """Get the next scheduled check time"""
+        return self.get_next_run_time(datetime.now(), self.checking_times)

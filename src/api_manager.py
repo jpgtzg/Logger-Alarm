@@ -1,0 +1,111 @@
+from fastapi import FastAPI, HTTPException
+from typing import Dict, Any, List
+from services.alarm_monitor import AlarmMonitor 
+import uvicorn
+from datetime import datetime
+import logging
+import os
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+
+app = FastAPI(title="Alarm Monitor API")
+
+alarm_monitor = AlarmMonitor()
+
+@app.get("/")
+async def root():
+    """API health check endpoint"""
+    return {
+        "status": "running",
+        "next_check": alarm_monitor.get_next_check_time().strftime("%Y-%m-%d %H:%M:%S"),
+        "check_times": alarm_monitor.checking_times
+    }
+
+@app.get("/alarms")
+async def get_alarms():
+    """Get all configured alarms"""
+    try:
+        alarms = alarm_monitor.get_alarms()
+        return {
+            "count": len(alarms),
+            "alarms": {
+                key: {
+                    "serial": alarm.serial_number,
+                    "channel": alarm.channel,
+                    "type": alarm.alarm_type.name,
+                    "threshold1": alarm.alarm_type.threshold1,
+                    "threshold2": alarm.alarm_type.threshold2,
+                    "active": alarm.active,
+                    "emails": alarm.emails,
+                    "pozo": alarm.pozo
+                } for key, alarm in alarms.items()
+            }
+        }
+    except Exception as e:
+        logging.error(f"Error getting alarms: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/alarms")
+async def create_alarm(alarm_data: Dict[str, Any]):
+    """Create a new alarm"""
+    try:
+        alarm_ids = alarm_monitor.create_alarm(alarm_data)
+        return {"message": "Alarm(s) created successfully", "alarm_ids": alarm_ids}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logging.error(f"Error creating alarm: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/alarms/{alarm_id}")
+async def update_alarm(alarm_id: str, alarm_data: Dict[str, Any]):
+    """Update an existing alarm"""
+    try:
+        alarm_monitor.update_alarm(alarm_id, alarm_data)
+        return {"message": f"Alarm {alarm_id} updated successfully"}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Alarm {alarm_id} not found")
+    except Exception as e:
+        logging.error(f"Error updating alarm: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/alarms/{alarm_id}")
+async def delete_alarm(alarm_id: str):
+    """Delete an alarm"""
+    try:
+        alarm_monitor.delete_alarm(alarm_id)
+        return {"message": f"Alarm {alarm_id} deleted successfully"}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Alarm {alarm_id} not found")
+    except Exception as e:
+        logging.error(f"Error deleting alarm: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/alarms/{alarm_id}/test")
+async def test_alarm(alarm_id: str):
+    """Test an alarm by forcing a check"""
+    try:
+        result = alarm_monitor.test_alarm(alarm_id)
+        return {
+            "message": "Alarm test completed",
+            "triggered": result,
+            "alarm_id": alarm_id
+        }
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Alarm {alarm_id} not found")
+    except Exception as e:
+        logging.error(f"Error testing alarm: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/check-times")
+async def get_check_times():
+    """Get configured check times"""
+    return {"check_times": alarm_monitor.checking_times}
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+

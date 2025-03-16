@@ -16,15 +16,9 @@ class AlarmType(Enum):
     EQUAL = "equal"          
 
     def __init__(self, value: str):
-        super().__init__()
         self._value = value
         self._threshold1: Optional[float] = None
         self._threshold2: Optional[float] = None
-
-    def __init__(self, json_data: dict):
-        self._value = json_data["value"]
-        self._threshold1 = json_data["threshold1"]
-        self._threshold2 = json_data["threshold2"]
 
     def __str__(self) -> str:
         return self._value
