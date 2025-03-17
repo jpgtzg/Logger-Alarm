@@ -93,6 +93,15 @@ async def delete_alarm(alarm_id: str):
         logging.error(f"Error deleting alarm: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.post("/alarms/test")
+async def test_alarms():
+    """Test all alarms by forcing a check"""
+    try:
+        alarm_monitor.check_alarms()
+    except Exception as e:
+        logging.error(f"Error testing alarms: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/alarms/{alarm_id}/test")
 async def test_alarm(alarm_id: str):
     """Test an alarm by forcing a check"""
