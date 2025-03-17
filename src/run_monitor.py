@@ -10,7 +10,7 @@ import os
 import signal
 
 # Configuration
-EMAIL_SENDING_TIMES = ["14:30", "18:30", "20:05", "22:30"]
+EMAIL_SENDING_TIMES = ["14:30", "18:30", "20:15", "22:30"]
 MAX_RETRIES = 3
 RETRY_DELAY = 60  # seconds
 
