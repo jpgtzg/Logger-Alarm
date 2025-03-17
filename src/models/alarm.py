@@ -193,3 +193,11 @@ class Alarm:
                     if self.alarm_type.check_alarm(value):
                         return True
         return False
+
+    def get_value(self) -> float:
+        """Get the value of the alarm"""
+        latest_data = get_latest_data(self.serial_number, self.channel)
+        if latest_data:
+            timestamp_str, value = latest_data
+            return float(value)
+        return None

@@ -259,3 +259,10 @@ class AlarmMonitor:
     def get_next_check_time(self) -> datetime:
         """Get the next scheduled check time"""
         return self.get_next_run_time(datetime.now(), self.checking_times)
+    
+    def get_alarm_value(self, alarm_id: str) -> float:
+        """Get the value of an alarm"""
+        with self._alarms_lock:
+            if alarm_id not in self.alarms:
+                raise KeyError(f"Alarm {alarm_id} not found")
+            return self.alarms[alarm_id].get_value()
