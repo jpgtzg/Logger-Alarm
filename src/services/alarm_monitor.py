@@ -72,11 +72,14 @@ class AlarmMonitor:
         """Check all active alarms"""
         logging.info("Starting alarm check...")
         
+        self.alarms = self.load_alarms()
+        
         # Get a copy of active alarms while holding lock
         with self._alarms_lock:
             alarms = self.alarms.copy()
 
-        logging.info(f"Alarms: {alarms}")
+        logging.info(f"Found {len(alarms)} total alarms")
+        logging.info(f"Alarm IDs: {list(alarms.keys())}")
 
         active_alarms = [
             alarm for alarm in alarms.values()
