@@ -139,7 +139,7 @@ class Alarm:
         
         display_name = self.logger_name if self.logger_name else self.serial_number
         pozo_info = f" (Pozo: {self.pozo})" if self.pozo else ""
-        subject = f"Alarm triggered: {display_name} - {self.channel}{pozo_info}"
+        subject = f"{display_name} - {self.channel}{pozo_info}"
         body = (f"The alarm for {display_name} ({self.serial_number}) - {self.channel}{pozo_info} has been triggered.\n"
                f"Current value: {value}\n"
                f"Threshold: {self.alarm_type.threshold1}")
@@ -155,7 +155,7 @@ class Alarm:
         
         display_name = self.logger_name if self.logger_name else self.serial_number
         pozo_info = f" (Pozo: {self.pozo})" if self.pozo else ""
-        subject = f"Old data: {display_name} - {self.channel}{pozo_info}"
+        subject = f"{display_name} - {self.channel}{pozo_info}"
         body = (f"The data for {display_name} ({self.serial_number}) - {self.channel}{pozo_info} is too old.\n"
                f"Last update: {timestamp}")
         
