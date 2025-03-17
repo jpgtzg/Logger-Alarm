@@ -116,6 +116,23 @@ class AlarmMonitor:
             logging.error(f"Error updating alarm {alarm_id}: {str(e)}")
             raise ValueError(f"Failed to update alarm: {str(e)}")
 
+    def delete_alarm(self, alarm_id: str) -> None:
+        """Delete an alarm from the alarms dictionary"""
+        try:
+            # Check existence and delete while holding lock
+            with self._alarms_lock:
+                if alarm_id not in self.alarms:
+                    raise KeyError(f"Alarm {alarm_id} not found")
+                del self.alarms[alarm_id]
+            
+            # Save after releasing lock
+            self.save_alarms()
+            logging.info(f"Deleted alarm: {alarm_id}")
+            
+        except Exception as e:
+            logging.error(f"Error deleting alarm {alarm_id}: {str(e)}")
+            raise ValueError(f"Failed to delete alarm: {str(e)}")
+
     def load_alarms(self) -> Dict[str, Alarm]:
         """
         Load alarms from storage file and convert to Alarm objects
@@ -172,6 +189,7 @@ class AlarmMonitor:
         try:
             os.makedirs(os.path.dirname("data/alarms.json"), exist_ok=True)
             
+            # Create the alarm dictionary while holding the lock
             with self._alarms_lock:
                 alarm_dict = {
                     key: {
@@ -186,13 +204,14 @@ class AlarmMonitor:
                     }
                     for key, alarm in self.alarms.items()
                 }
-                
-                with open("data/alarms.json", 'w') as f:
-                    json.dump({
-                        'alarms': alarm_dict,
-                    }, f, indent=2)
+            
+            # Release lock before file I/O
+            with open("data/alarms.json", 'w') as f:
+                json.dump({
+                    'alarms': alarm_dict,
+                }, f, indent=2)
                     
-            logging.info(f"Successfully saved {len(self.alarms)} alarms")
+            logging.info(f"Successfully saved {len(alarm_dict)} alarms")
             
         except Exception as e:
             logging.error(f"Error saving alarms: {str(e)}")

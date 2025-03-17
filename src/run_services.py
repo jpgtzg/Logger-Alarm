@@ -20,7 +20,7 @@ def setup_logging():
 
 def run_api():
     """Run the FastAPI server"""
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
 def main():
     setup_logging()
