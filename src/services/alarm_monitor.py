@@ -70,6 +70,8 @@ class AlarmMonitor:
 
     def check_alarms(self):
         """Check all active alarms"""
+        logging.info("Starting alarm check...")
+        
         # Get a copy of active alarms while holding lock
         with self._alarms_lock:
             active_alarms = [
@@ -77,12 +79,21 @@ class AlarmMonitor:
                 if alarm.is_active()
             ]
         
+        logging.info(f"Found {len(active_alarms)} active alarms to check")
+        
         # Check alarms outside the lock
         for alarm in active_alarms:
             try:
-                alarm.check_alarm()
+                logging.info(f"Checking alarm {alarm.id} for logger {alarm.serial_number}")
+                result = alarm.check_alarm()
+                if result:
+                    logging.info(f"Alarm {alarm.id} was triggered")
+                else:
+                    logging.info(f"Alarm {alarm.id} check completed - no trigger")
             except Exception as e:
                 logging.error(f"Error checking alarm {alarm.id}: {str(e)}")
+        
+        logging.info("Alarm check completed")
 
     def get_alarms(self):
         with self._alarms_lock:
