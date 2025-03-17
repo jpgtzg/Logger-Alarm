@@ -8,8 +8,7 @@ import requests
 from algorithms.excel_reader import read_excel_thresholds
 
 # Constants
-#API_URL = f"http://{st.secrets['api_url']}"  # Add http:// protocol to the API URL
-API_URL = "http://localhost:8000"
+API_URL = f"http://{st.secrets['api_url']}"  # Add http:// protocol to the API URL
 ALARM_TYPES = ["ABOVE", "BELOW", "BETWEEN", "OUTSIDE"]
 
 def init_session_state():
