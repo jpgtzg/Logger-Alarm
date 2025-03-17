@@ -68,12 +68,16 @@ class AlarmMonitor:
             self.check_alarms()
 
     def check_alarms(self):
+        """Check all active alarms"""
+        # Get a copy of active alarms while holding lock
         with self._alarms_lock:
-            alarms_to_check = self.alarms.copy()
+            active_alarms = [
+                alarm for alarm in self.alarms.values()
+                if alarm.is_active()
+            ]
         
-        for alarm in alarms_to_check.values():
-            if not alarm.is_active():
-                continue
+        # Check alarms outside the lock
+        for alarm in active_alarms:
             try:
                 alarm.check_alarm()
             except Exception as e:
