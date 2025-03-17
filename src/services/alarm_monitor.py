@@ -36,7 +36,7 @@ class AlarmMonitor:
     
     def __new__(cls, checking_times: list[str] = None):
         if cls._instance is None:
-            cls._instance = super(AlarmMonitor, cls).__new__(cls)
+            cls._instance = super(AlarmMonitor, cls, checking_times).__new__(cls)
         return cls._instance
 
     def __init__(self, checking_times: list[str] = None):
@@ -44,7 +44,7 @@ class AlarmMonitor:
         if not self._initialized:
             self._alarms_lock = threading.Lock()
             self._logger_names_lock = threading.Lock()
-            self.checking_times = checking_times or ["14:30", "18:30", "19:15", "22:30"]
+            self.checking_times = checking_times or ["14:30", "18:30", "22:30"]
             self.alarms = self.load_alarms()
             self._initialized = True
         elif checking_times is not None and checking_times != self.checking_times:
