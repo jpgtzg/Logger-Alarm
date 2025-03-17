@@ -99,6 +99,15 @@ def test_alarm(alarm_id: str):
     except Exception as e:
         st.error(f"Error testing alarm: {str(e)}")
 
+def test_alarms():
+    """Test all alarms via API"""
+    try:
+        response = requests.post(f"{API_URL}/alarms/test")
+        response.raise_for_status()
+        st.success("Alarms tested successfully!")
+    except Exception as e:
+        st.error(f"Error testing alarms: {str(e)}")
+
 def refresh_logger_names():
     """Refresh logger names via API"""
     try:
@@ -122,6 +131,10 @@ def main():
     # Sidebar
     st.sidebar.title("🔔 Alarm Monitor")
     st.sidebar.markdown("---")
+
+    # Test alarms button
+    if st.sidebar.button("🧪 Test Alarms"):
+        test_alarms()
 
     # Refresh data button in sidebar
     if st.sidebar.button("🔄 Refresh All Data"):
