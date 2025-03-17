@@ -34,9 +34,9 @@ class AlarmMonitor:
     _initialized = False
     _all_logs = []
     
-    def __new__(cls, checking_times: list[str] = None):
+    def __new__(cls, *args, **kwargs):
         if cls._instance is None:
-            cls._instance = super(AlarmMonitor, cls, checking_times).__new__(cls)
+            cls._instance = super(AlarmMonitor, cls).__new__(cls)
         return cls._instance
 
     def __init__(self, checking_times: list[str] = None):
