@@ -263,7 +263,7 @@ class AlarmMonitor:
             alarm = self.alarms[alarm_id]
             
         # Run check without sending email
-        return alarm.check_alarm(send_email=False)
+        return alarm.check_alarm(send_email=True)
 
     def get_next_run_time(self, current_time: datetime, check_times: List[str]) -> datetime:
             """Get the next closest run time from now.
