@@ -12,3 +12,4 @@
 *.xls
 data/alarms.json
 logs/alarm_monitor.log
+.streamlit/secrets.toml

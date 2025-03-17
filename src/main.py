@@ -1,12 +1,15 @@
+from datetime import datetime
+from typing import Dict, Any
+import os
+import json
 import streamlit as st
 import requests
-import json
-from datetime import datetime
-import pandas as pd
-from typing import Dict, Any
+
+from algorithms.excel_reader import read_excel_thresholds
 
 # Constants
-API_URL = "http://localhost:8000"  # Match the API port
+#API_URL = f"http://{st.secrets['api_url']}"  # Add http:// protocol to the API URL
+API_URL = "http://localhost:8000"
 ALARM_TYPES = ["ABOVE", "BELOW", "BETWEEN", "OUTSIDE"]
 
 def init_session_state():
@@ -141,7 +144,54 @@ def main():
 
     # Main content
     st.title("🔔 Alarm Monitor Dashboard")
-
+    
+    st.header("Import Alarms from File")
+    uploaded_file = st.file_uploader("Upload CSV or Excel file", type=['csv', 'xlsx', 'xls'])
+    
+    if uploaded_file is not None:
+        try:
+            file_ext = os.path.splitext(uploaded_file.name)[1].lower()
+            temp_file_path = f"temp_upload{file_ext}"
+            with open(temp_file_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+            
+            thresholds = read_excel_thresholds(temp_file_path)
+            
+            if thresholds:
+                new_alarms_count = 0
+                for serial_number, data in thresholds.items():
+                    if data['threshold'] != -1.0:
+                        # Create alarm data in the format expected by the API
+                        alarm_data = {
+                            "serial": serial_number,
+                            "channel": "Pressure1",
+                            "type": "BELOW",
+                            "threshold1": data['threshold'],
+                            "threshold2": None,
+                            "enabled": True,
+                            "emails": data['emails'],
+                            "pozo": data.get('pozo', '')  # Optional pozo field
+                        }
+                        
+                        try:
+                            # Use the API to create the alarm
+                            response = requests.post(f"{API_URL}/alarms", json=alarm_data)
+                            response.raise_for_status()
+                            new_alarms_count += 1
+                        except requests.exceptions.RequestException as e:
+                            st.error(f"Failed to create alarm for logger {serial_number}: {str(e)}")
+                            continue
+                
+                if new_alarms_count > 0:
+                    st.success(f"Successfully added {new_alarms_count} new alarms!")
+                    # Refresh the alarms data
+                    fetch_api_data()
+                else:
+                    st.info("No new alarms were added.")
+            
+            os.remove(temp_file_path)
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
     # Create new alarm section
     with st.expander("➕ Create New Alarm", expanded=False):
         col1, col2 = st.columns(2)

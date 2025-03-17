@@ -98,14 +98,20 @@ class AlarmMonitor:
             # Convert single dict to list for uniform processing
             alarm_data_list = [json_data] if isinstance(json_data, dict) else json_data
             
+            # Create alarms outside the lock
+            new_alarms = {}
+            for data in alarm_data_list:
+                alarm = Alarm.from_dict(data)
+                new_alarms[alarm.id] = alarm
+                created_ids.append(alarm.id)
+                logging.info(f"Created alarm: {alarm.id} for logger {alarm.serial_number}")
+            
+            # Add alarms to the dictionary while holding lock
             with self._alarms_lock:
-                for data in alarm_data_list:
-                    alarm = Alarm.from_dict(data)
-                    self.alarms[alarm.id] = alarm
-                    created_ids.append(alarm.id)
-                    logging.info(f"Created alarm: {alarm.id} for logger {alarm.serial_number}")
-                
-                self.save_alarms()
+                self.alarms.update(new_alarms)
+            
+            # Save after releasing lock
+            self.save_alarms()
             
             return created_ids
             
@@ -122,13 +128,14 @@ class AlarmMonitor:
             json_data: Dictionary containing new alarm configuration
         """
         try:
+            # Check existence and update while holding lock
             with self._alarms_lock:
                 if alarm_id not in self.alarms:
                     raise KeyError(f"Alarm {alarm_id} not found")
-                
                 self.alarms[alarm_id].update(json_data)
-                self.save_alarms()
-                
+            
+            # Save after releasing lock
+            self.save_alarms()
             logging.info(f"Updated alarm: {alarm_id}")
             
         except Exception as e:
