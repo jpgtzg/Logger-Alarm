@@ -183,12 +183,9 @@ class AlarmMonitor:
             Dict[str, Alarm]: Dictionary with alarm_id -> Alarm object mapping
         """
         alarms = {}
-        alarms_file = os.path.abspath("data/alarms.json")
-        logging.info(f"Loading alarms from: {alarms_file}")
-        
-        if os.path.exists(alarms_file):
+        if os.path.exists("data/alarms.json"):
             try:
-                with open(alarms_file, 'r') as f:
+                with open("data/alarms.json", 'r') as f:
                     data = json.load(f)
                     
                 alarm_data = data.get('alarms', data) if isinstance(data, dict) else data
@@ -209,7 +206,7 @@ class AlarmMonitor:
             except Exception as e:
                 logging.error(f"Unexpected error loading alarms: {str(e)}")
         else:
-            logging.info(f"No alarms.json file found at {alarms_file}, starting with empty alarms")
+            logging.info("No alarms.json file found, starting with empty alarms")
         
         return alarms
 
@@ -232,8 +229,7 @@ class AlarmMonitor:
     def save_alarms(self) -> None:
         """Save alarms to storage file"""
         try:
-            alarms_file = os.path.abspath("data/alarms.json")
-            os.makedirs(os.path.dirname(alarms_file), exist_ok=True)
+            os.makedirs(os.path.dirname("data/alarms.json"), exist_ok=True)
             
             # Create the alarm dictionary while holding the lock
             with self._alarms_lock:
@@ -252,12 +248,12 @@ class AlarmMonitor:
                 }
             
             # Release lock before file I/O
-            with open(alarms_file, 'w') as f:
+            with open("data/alarms.json", 'w') as f:
                 json.dump({
                     'alarms': alarm_dict,
                 }, f, indent=2)
                     
-            logging.info(f"Successfully saved {len(alarm_dict)} alarms to {alarms_file}")
+            logging.info(f"Successfully saved {len(alarm_dict)} alarms")
             
         except Exception as e:
             logging.error(f"Error saving alarms: {str(e)}")
