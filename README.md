@@ -1,5 +1,5 @@
 # Logger-Alarm
-Backend service for managing pressure alarms for the Ovarro Loggers
+Backend service for managing pressure alarms and notifications for the Ovarro Loggers
 
 # Authors
 
