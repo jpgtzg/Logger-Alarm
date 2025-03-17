@@ -94,26 +94,26 @@ class AlarmMonitor:
             logging.error(f"Error creating alarm(s): {str(e)}")
             raise ValueError(f"Failed to create alarm(s): {str(e)}")
 
-    def update_alarm(self, alarm_key: str, json_data: dict) -> None:
+    def update_alarm(self, alarm_id: str, json_data: dict) -> None:
         """
         Update an existing alarm with new data
         
         Args:
-            alarm_key: The alarm identifier (serial_number_channel)
+            alarm_id: The alarm identifier (serial number_channel)
             json_data: Dictionary containing new alarm configuration
         """
         try:
             with self._alarms_lock:
-                if alarm_key not in self.alarms:
-                    raise KeyError(f"Alarm {alarm_key} not found")
+                if alarm_id not in self.alarms:
+                    raise KeyError(f"Alarm {alarm_id} not found")
                 
-                self.alarms[alarm_key].update(json_data)
+                self.alarms[alarm_id].update(json_data)
                 self.save_alarms()
                 
-            logging.info(f"Updated alarm: {alarm_key}")
+            logging.info(f"Updated alarm: {alarm_id}")
             
         except Exception as e:
-            logging.error(f"Error updating alarm {alarm_key}: {str(e)}")
+            logging.error(f"Error updating alarm {alarm_id}: {str(e)}")
             raise ValueError(f"Failed to update alarm: {str(e)}")
 
     def load_alarms(self) -> Dict[str, Alarm]:
@@ -121,7 +121,7 @@ class AlarmMonitor:
         Load alarms from storage file and convert to Alarm objects
         
         Returns:
-            Dict[str, Alarm]: Dictionary with alarm_key -> Alarm object mapping
+            Dict[str, Alarm]: Dictionary with alarm_id -> Alarm object mapping
         """
         alarms = {}
         if os.path.exists("data/alarms.json"):
@@ -131,13 +131,13 @@ class AlarmMonitor:
                     
                 alarm_data = data.get('alarms', data) if isinstance(data, dict) else data
                 
-                for alarm_key, alarm_dict in alarm_data.items():
+                for alarm_id, alarm_dict in alarm_data.items():
                     try:
                         alarm = Alarm.from_dict(alarm_dict)
-                        alarms[alarm_key] = alarm
-                        logging.info(f"Loaded alarm: {alarm_key} for logger {alarm.serial_number}")
+                        alarms[alarm_id] = alarm
+                        logging.info(f"Loaded alarm: {alarm_id} for logger {alarm.serial_number}")
                     except Exception as e:
-                        logging.error(f"Error loading alarm {alarm_key}: {str(e)}")
+                        logging.error(f"Error loading alarm {alarm_id}: {str(e)}")
                         continue
                 
                 logging.info(f"Successfully loaded {len(alarms)} alarms")
