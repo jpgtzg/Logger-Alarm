@@ -20,5 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application
 COPY . .
 
+EXPOSE 8000
 # Run the services
 CMD ["python", "src/run_services.py"]
