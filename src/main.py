@@ -21,6 +21,8 @@ def init_session_state():
         st.session_state.next_check = None
     if 'alarm_values' not in st.session_state:
         st.session_state.alarm_values = {}
+    if 'delete_confirmation' not in st.session_state:
+        st.session_state.delete_confirmation = None
 
 def fetch_api_data():
     """Fetch all necessary data from the API"""
@@ -220,9 +222,20 @@ def main():
                     st.markdown("### 🛠️ Actions")
                     if st.button("🧪 Test", key=f"test_{alarm_id}"):
                         test_alarm(alarm_id)
-                    if st.button("🗑️ Delete", key=f"delete_{alarm_id}"):
-                        if st.button("Confirm Delete", key=f"confirm_delete_{alarm_id}"):
-                            delete_alarm(alarm_id)
+                    
+                    # Delete button with confirmation
+                    if st.session_state.delete_confirmation == alarm_id:
+                        col3_1, col3_2 = st.columns(2)
+                        with col3_1:
+                            if st.button("✅ Confirm", key=f"confirm_{alarm_id}"):
+                                delete_alarm(alarm_id)
+                                st.session_state.delete_confirmation = None
+                        with col3_2:
+                            if st.button("❌ Cancel", key=f"cancel_{alarm_id}"):
+                                st.session_state.delete_confirmation = None
+                    else:
+                        if st.button("🗑️ Delete", key=f"delete_{alarm_id}"):
+                            st.session_state.delete_confirmation = alarm_id
     else:
         st.info("No alarms configured yet. Create one using the form above!")
 
