@@ -15,7 +15,8 @@ def setup_logging():
     
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s'
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        filename='logs/alarm_monitor.log'
     )
 
 def run_api():
