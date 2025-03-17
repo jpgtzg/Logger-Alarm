@@ -1,3 +1,8 @@
+"""
+    API Manager for the alarm monitor, allows for the creation, updating, deletion and testing of alarms. 
+    Shares the same instance of the alarm monitor as the run_monitor.py file.
+"""
+
 from fastapi import FastAPI, HTTPException
 from typing import Dict, Any, List
 from services.alarm_monitor import AlarmMonitor 
@@ -152,6 +157,19 @@ async def get_logger_name(serial_number: str):
         raise
     except Exception as e:
         logging.error(f"Error getting logger name: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/alarm/{alarm_id}/value")
+async def get_alarm_value(alarm_id: str):
+    """Get the value of an alarm"""
+    try:
+        result = alarm_monitor.get_alarm_value(alarm_id)
+        return {"message": "Alarm value retrieved", "value": result}
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Alarm {alarm_id} not found")
+    except Exception as e:
+        logging.error(f"Error getting alarm value: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

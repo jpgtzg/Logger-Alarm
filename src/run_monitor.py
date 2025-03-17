@@ -1,5 +1,5 @@
 """
-    Backend service entry point with additional robustness
+    Backend service entry point with additional robustness. Starts the monitoring service
 """
 import sys
 import logging
