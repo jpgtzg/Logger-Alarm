@@ -8,7 +8,26 @@ import logging
 from models.alarm_type import AlarmType
 import threading
 from api.api_manager import get_all_logs
+
+# Ensure directories exist
+os.makedirs('logs', exist_ok=True)
+os.makedirs('data', exist_ok=True)
+
+# Setup logger
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+# Add handlers if they don't exist
+if not logger.handlers:
+    # File handler
+    file_handler = logging.FileHandler('logs/alarm_monitor.log')
+    file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(file_handler)
+    
+    # Stream handler
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+    logger.addHandler(stream_handler)
 
 class AlarmMonitor:
     _instance = None

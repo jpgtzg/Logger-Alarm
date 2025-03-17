@@ -1,20 +1,24 @@
-FROM python:3.12
+FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     python3-dev \
-    git
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/data \
+    && chmod 777 /app/logs /app/data
 
-COPY . /app
+# Copy requirements first to leverage Docker cache
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN chmod +x start.sh
+# Copy the rest of the application
+COPY . .
 
-EXPOSE 8000
-
-CMD ["./start.sh"]
+# Run the services
+CMD ["python", "src/run_services.py"]

@@ -7,6 +7,7 @@
 
 from datetime import datetime
 from typing import Dict, Any
+import os
 
 from algorithms.mail_sender import send_email
 from .alarm_type import AlarmType
@@ -15,14 +16,21 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('logs/alarm_monitor.log'),
-        logging.StreamHandler()
-    ]
-)
+# Ensure log directory exists
+os.makedirs('logs', exist_ok=True)
+
+# Setup file handler
+file_handler = logging.FileHandler('logs/alarm_monitor.log')
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Setup stream handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Configure logger
+logger.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+logger.addHandler(stream_handler)
 
 class Alarm:
     active: bool = True

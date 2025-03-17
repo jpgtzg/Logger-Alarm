@@ -1,22 +1,23 @@
 """
 Service runner that manages both the monitor and API server. 
 """
+import os
 import multiprocessing
 import uvicorn
 import logging
-import os
+
+# Create necessary directories
+os.makedirs('logs', exist_ok=True)
+os.makedirs('data', exist_ok=True)
+
 from api_manager import app
 from run_monitor import main as run_monitor
 
 def setup_logging():
     """Setup logging configuration"""
-    os.makedirs('logs', exist_ok=True)
-    os.makedirs('data', exist_ok=True)
-    
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        filename='logs/alarm_monitor.log'
+        format='%(asctime)s - %(levelname)s - %(message)s'
     )
 
 def run_api():
