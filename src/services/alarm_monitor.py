@@ -48,7 +48,8 @@ class AlarmMonitor:
             self.alarms = self.load_alarms()
             self._initialized = True
         elif checking_times is not None and checking_times != self.checking_times:
-            logging.warning(f"Attempted to reinitialize AlarmMonitor with different checking times. Using existing times: {self.checking_times}")
+            logging.info(f"Updating check times from {self.checking_times} to {checking_times}")
+            self.checking_times = checking_times
 
     def run(self):
 
