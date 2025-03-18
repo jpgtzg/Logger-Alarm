@@ -126,7 +126,7 @@ class Alarm:
         self.id = f"{self.serial_number}_{self.channel}"
 
     def __str__(self):
-        return f"Alarm(serial_number={self.serial_number}, channel_name={self.channel}, alarm_type={self.alarm_type}, active={self.active}, id={self.id})"
+        return f"Alarm(serial_number={self.serial_number}, channel_name={self.channel}, alarm_type={self.alarm_type}, active={self.active}, pozo={self.pozo}, threshold1={self.alarm_type.threshold1}, threshold2={self.alarm_type.threshold2}, id={self.id})"
 
     def is_active(self) -> bool:
         return self.active
