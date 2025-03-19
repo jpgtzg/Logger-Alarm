@@ -125,6 +125,7 @@ class AlarmMonitor:
             new_alarms = {}
             for data in alarm_data_list:
                 alarm = Alarm.from_dict(data)
+                alarm.logger_name = self._get_logger_name(alarm.serial_number)
                 new_alarms[alarm.id] = alarm
                 created_ids.append(alarm.id)
             
@@ -248,7 +249,8 @@ class AlarmMonitor:
                         'threshold2': alarm.threshold2,
                         'enabled': alarm.active,  
                         'emails': alarm.emails,
-                        'pozo': alarm.pozo
+                        'pozo': alarm.pozo,
+                        'logger_name': alarm.logger_name
                     }
                     for key, alarm in self.alarms.items()
                 }
