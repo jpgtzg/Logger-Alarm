@@ -127,15 +127,14 @@ class AlarmMonitor:
                 alarm = Alarm.from_dict(data)
                 new_alarms[alarm.id] = alarm
                 created_ids.append(alarm.id)
-                logging.info(f"Created alarm: {alarm.id} for logger {alarm.serial_number}")
             
             # Add alarms to the dictionary while holding lock
             with self._alarms_lock:
-                self.alarms.update(new_alarms)
-            
+                for alarm_id, alarm_data in new_alarms.items():
+                    self.alarms[alarm_id] = alarm_data
+
             # Save after releasing lock
             self.save_alarms()
-            
             return created_ids
             
         except Exception as e:
@@ -245,8 +244,8 @@ class AlarmMonitor:
                         'serial': alarm.serial_number,
                         'channel': alarm.channel,
                         'type': alarm.alarm_type.name,
-                        'threshold1': alarm.alarm_type.threshold1,
-                        'threshold2': alarm.alarm_type.threshold2,
+                        'threshold1': alarm.threshold1,
+                        'threshold2': alarm.threshold2,
                         'enabled': alarm.active,  
                         'emails': alarm.emails,
                         'pozo': alarm.pozo
@@ -260,8 +259,6 @@ class AlarmMonitor:
                     'alarms': alarm_dict,
                 }, f, indent=2)
                     
-            logging.info(f"Successfully saved {len(alarm_dict)} alarms")
-            
         except Exception as e:
             logging.error(f"Error saving alarms: {str(e)}")
             raise
