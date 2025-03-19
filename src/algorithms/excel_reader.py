@@ -52,6 +52,7 @@ def read_excel_thresholds(file_path):
     else:
         raise ValueError(f"Unsupported file format: {file_ext}. Please use CSV or Excel files.")
 
+    
     threshold_dict = {}
     for index, row in df.iterrows():
         try:
@@ -63,20 +64,25 @@ def read_excel_thresholds(file_path):
             if serial_number.startswith('XLG'):
                 serial_number = serial_number[3:]  # Remove 'XLG'
 
-            threshold_column = "Threshold" if "Threshold" in df.columns else "Treshhold"
+            pozo_column = None
+            for possible_column in ['Pozo/Observacion', 'Pozo', 'Observacion', 'Pozo/Observación', 'Pozos']:
+                if possible_column in df.columns:
+                    pozo_column = possible_column
+                    break
             
+            pozos = str(row[pozo_column]) if pozo_column and pd.notna(row[pozo_column]) else ""
+            pozos_list = [pozo.strip() for pozo in pozos.split(',') if pozo.strip()]
+
+            threshold_column = "Threshold" if "Threshold" in df.columns else "Treshhold"
             threshold = float(row[threshold_column]) if threshold_column in row and pd.notna(row[threshold_column]) else -1.0
             
             emails = str(row['Correos']) if 'Correos' in row and pd.notna(row['Correos']) else ""
             email_list = [email.strip() for email in emails.split(',') if email.strip()]
 
-            pozos = str(row['Pozo/Observacion']) if 'Pozo/Observacion' in row and pd.notna(row['Pozo/Observacion']) else ""
-            pozos_list = [pozo.strip() for pozo in pozos.split(',') if pozo.strip()]
-
             threshold_dict[serial_number] = {
                 'threshold': threshold,
                 'emails': email_list,
-                'pozos': pozos_list
+                'pozo': pozos_list
             }
             
         except (ValueError, TypeError, KeyError) as e:
