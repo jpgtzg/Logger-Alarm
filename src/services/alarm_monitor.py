@@ -44,7 +44,7 @@ class AlarmMonitor:
         if not self._initialized:
             self._alarms_lock = threading.Lock()
             self._logger_names_lock = threading.Lock()
-            self.checking_times = checking_times or ["14:30", "18:30", "22:30"]
+            self.checking_times = checking_times or ["06:30", "14:30", "22:30"]
             self.alarms = self.load_alarms()
             self._initialized = True
         elif checking_times is not None and checking_times != self.checking_times:
